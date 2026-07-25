@@ -123,7 +123,7 @@ module vte_axil_regs #(
   // ---------------------------------------------------------------------------
   // Flattened view of the palette for the configuration bundle. A generate loop is
   // used because the slice base has to be an elaboration time constant.
-  for (genvar gi = 0; gi < int'(vte_pkg::PalEntries); gi++) begin : g_pal_flat
+  for (genvar gi = 0; gi < vte_pkg::PalEntries; gi++) begin : g_pal_flat
     assign pal_flat[vte_pkg::PalEntryW*gi+:vte_pkg::PalEntryW] = pal_q[gi];
   end
 
@@ -228,7 +228,7 @@ module vte_axil_regs #(
       cur_div_q         <= 8'd15;
       txt_div_q         <= 8'd15;
       scratch_q         <= '0;
-      for (int unsigned i = 0; i < vte_pkg::PalEntries; i++) begin
+      for (int i = 0; i < vte_pkg::PalEntries; i++) begin
         pal_q[i] <= vte_pkg::PalEntryW'(vte_pkg::PalDefault >> (vte_pkg::PalEntryW * i));
       end
       underrun_sticky_q <= 1'b0;

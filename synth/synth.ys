@@ -1,0 +1,38 @@
+# Copyright 2026 Daniel Tyukov
+# SPDX-License-Identifier: Apache-2.0
+#
+# Yosys synthesis smoke test for vga_text_engine.
+#
+# Maps to the generic gate library rather than any particular technology, which is
+# enough to prove the design is synthesisable, that no latch is inferred anywhere, and
+# that no submodule is left as a black box. SYNTHESIS is defined so the elaboration
+# time parameter checks, which use simulation only system tasks, are excluded.
+#
+# Run with: make synth
+
+read_verilog -sv -DSYNTHESIS \
+    rtl/vte_modes_pkg.sv \
+    rtl/vte_pkg.sv \
+    rtl/vte_mode_lut.sv \
+    rtl/vte_sync2.sv \
+    rtl/vte_cdc_fifo.sv \
+    rtl/vte_frame_sync.sv \
+    rtl/vte_timing_gen.sv \
+    rtl/vte_glyph_rom.sv \
+    rtl/vte_shader.sv \
+    rtl/vte_fetch_engine.sv \
+    rtl/vte_axil_regs.sv \
+    rtl/vga_text_engine.sv
+
+hierarchy -check -top vga_text_engine
+
+# Per submodule area before flattening, for the cell count chart in the README.
+tee -o synth/stat_hier.txt synth -run coarse
+tee -a synth/stat_hier.txt stat
+
+# Full mapping to generic gates.
+synth -top vga_text_engine
+tee -o synth/stat_flat.txt stat
+tee -a synth/stat_flat.txt check -assert
+
+write_json synth/vga_text_engine.json

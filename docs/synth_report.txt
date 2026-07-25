@@ -1,0 +1,69 @@
+vga_text_engine synthesis smoke test
+========================================================================
+
+Tool     : Yosys 0.33
+Script   : synth/synth.ys
+Target   : generic gate library (techmap), no technology mapping
+Top      : vga_text_engine
+Params   : RedW=8 GreenW=8 BlueW=8 FifoDepth=32 AxiAddrW=12 FetchAddrW=32
+
+Whole design
+------------------------------------------------------------------------
+  cells               9777
+  flip flops          1987
+  combinational       7790
+  wire bits          15980
+  inferred latches       0
+  black boxes            0
+
+Cells per submodule, one instance and the whole design
+------------------------------------------------------------------------
+  module                per instance  instances     total
+  vte_axil_regs                 2469          1      2469
+  vte_glyph_rom                 1527          1      1527
+  vte_cdc_fifo                  1424          1      1424
+  vte_timing_gen                1379          1      1379
+  vte_shader                     930          1       930
+  vte_frame_sync                 790          1       790
+  vte_fetch_engine               723          1       723
+  vte_mode_lut                   170          3       510
+  vte_sync2                        2          6        12
+  vga_text_engine                  8          1         8
+
+Cell mix, whole design
+------------------------------------------------------------------------
+  $_ANDNOT_               2340
+  $_MUX_                  2105
+  $_OR_                   1421
+  $_DFFE_PN0P_            1149
+  $_DFFE_PP_               608
+  $_XOR_                   549
+  $_NAND_                  293
+  $_ORNOT_                 264
+  $_AND_                   246
+  $_NOT_                   215
+  $_NOR_                   190
+  $_XNOR_                  167
+  $_DFFE_PN1P_             124
+  $_DFF_PN0_                93
+  $_DFF_P_                   8
+  $_DFF_PN1_                 3
+  $_DFFE_PN0N_               2
+
+Where the area goes
+------------------------------------------------------------------------
+  vte_axil_regs     storage dominates: 16 palette entries of 12 bits plus
+                    about 100 bits of configuration, the 32 bit read mux and
+                    the read-modify-write path for byte strobes.
+  vte_glyph_rom     3072 bytes of constant data mapped to gates because the
+                    generic library has no memory primitive. On an FPGA or
+                    with a technology library this is one block RAM.
+  vte_cdc_fifo      32 entries of 19 bits as distributed registers, plus the
+                    gray coded pointers and both synchronisers.
+  vte_timing_gen    two 12 bit position counters, the region comparators and
+                    the grid clamping arithmetic.
+  vte_frame_sync    two more copies of the configuration bundle, one frozen
+                    shadow in the register domain and one live in the pixel
+                    domain. That is the price of atomic reconfiguration.
+
+No inferred latches and no black boxes.

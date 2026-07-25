@@ -68,7 +68,8 @@ package vte_pkg;
   // 16 programmable RGB444 entries. Entry i occupies pal[12*i +: 12] with red in
   // the upper nibble: {R[3:0], G[3:0], B[3:0]}.
 
-  localparam int unsigned PalEntries = 16;
+  // Signed int so that a genvar loop bound needs no cast, which Yosys 0.33 rejects.
+  localparam int PalEntries = 16;
   localparam int unsigned PalEntryW = 12;
   localparam int unsigned PalW = 192;
 

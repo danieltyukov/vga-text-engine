@@ -12,6 +12,8 @@ results/
 obj_dir/
 *.log
 
-# Synthesis intermediates
+# Synthesis intermediates. docs/synth_report.txt is the committed artefact.
 synth/*.json
 synth/*.v
+synth/*.log
+synth/stat_*.txt

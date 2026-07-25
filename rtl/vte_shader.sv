@@ -225,7 +225,7 @@ module vte_shader #(
 
   // 16 way palette mux. The generate loop gives each entry a literal slice base and
   // the array index collapses to a single mux.
-  for (genvar gi = 0; gi < int'(vte_pkg::PalEntries); gi++) begin : g_pal_split
+  for (genvar gi = 0; gi < vte_pkg::PalEntries; gi++) begin : g_pal_split
     assign pal_arr[gi] = cfg_i.pal[vte_pkg::PalEntryW*gi+:vte_pkg::PalEntryW];
   end
   assign pal_entry = pal_arr[pal_idx];
