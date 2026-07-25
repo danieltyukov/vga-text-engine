@@ -17,3 +17,4 @@ synth/*.json
 synth/*.v
 synth/*.log
 synth/stat_*.txt
+synth/out/

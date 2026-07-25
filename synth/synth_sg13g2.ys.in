@@ -1,0 +1,60 @@
+# Copyright 2026 Daniel Tyukov
+# SPDX-License-Identifier: Apache-2.0
+#
+# Yosys synthesis of vga_text_engine to the IHP Open PDK SG13G2 130 nm standard cell
+# library. Produces real silicon area in square micrometres and a real cell histogram, a
+# gate level netlist for static timing analysis and gate level simulation, and a JSON
+# netlist for schematic rendering.
+#
+# This is a template. scripts/synth_sg13g2.py substitutes the placeholders and writes the
+# result next to the reports, so any run can be reproduced by hand from the generated
+# script. Placeholders:
+#
+#   @LIB@      Liberty file for the corner being characterised
+#   @CORNER@   short corner name, used in the output file names
+#   @OUT@      output directory
+#   @FLATTEN@  "-flatten" for the signoff run, empty for the per submodule area run
+#   @TAG@      "flat" or "hier", used in the output file names
+#
+# The driver runs this twice per corner. The hierarchical run keeps module boundaries so
+# stat can report an area per submodule; the flattened run is the signoff netlist, where
+# cross boundary optimisation has been allowed. Mapping has to start from the RTL each
+# time: running abc a second time over cells it has already mapped produces a netlist
+# with undriven outputs.
+#
+# check runs here for the record but does not assert. After flatten, Yosys keeps both the
+# port wire and the flattened alias of it, opt_clean drops the alias, and check then
+# reports the alias as an undriven wire even though the port is driven by a cell. Reading
+# the written netlist back and checking that proves the point: the artifact that leaves
+# this script is clean. scripts/synth_sg13g2.py does exactly that, and gate level
+# simulation of a whole frame against the reference renderer is the real proof.
+#
+# SYNTHESIS is defined so the elaboration time parameter checks, which use simulation
+# only system tasks, are excluded.
+
+read_verilog -sv -DSYNTHESIS \
+    rtl/vte_modes_pkg.sv \
+    rtl/vte_pkg.sv \
+    rtl/vte_mode_lut.sv \
+    rtl/vte_sync2.sv \
+    rtl/vte_cdc_fifo.sv \
+    rtl/vte_frame_sync.sv \
+    rtl/vte_timing_gen.sv \
+    rtl/vte_glyph_rom.sv \
+    rtl/vte_shader.sv \
+    rtl/vte_fetch_engine.sv \
+    rtl/vte_axil_regs.sv \
+    rtl/vga_text_engine.sv
+
+hierarchy -check -top vga_text_engine
+
+synth -top vga_text_engine @FLATTEN@
+dfflibmap -liberty @LIB@
+abc -liberty @LIB@
+opt_clean
+
+tee -o @OUT@/area_@TAG@_@CORNER@.txt stat -liberty @LIB@
+tee -o @OUT@/check_@TAG@_@CORNER@.txt check
+
+write_json @OUT@/netlist_@TAG@_@CORNER@.json
+write_verilog -noattr @OUT@/netlist_@TAG@_@CORNER@.v

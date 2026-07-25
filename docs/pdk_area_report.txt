@@ -1,0 +1,89 @@
+vga_text_engine standard cell synthesis
+============================================================================
+
+Tool      : Yosys 0.33
+PDK       : IHP Open PDK SG13G2, 130 nm BiCMOS, open source
+Library   : sg13g2_stdcell
+Script    : synth/synth_sg13g2.ys.in
+Top       : vga_text_engine
+Params    : RedW=8 GreenW=8 BlueW=8 FifoDepth=32 AxiAddrW=12 FetchAddrW=32
+Signoff   : slow corner, 1.08 V, 125 C
+
+Area is standard cell area after technology mapping, in square
+micrometres: every mapped cell multiplied by its Liberty area. It excludes
+routing, filler and tap cells, so a placed and routed die is larger.
+
+Whole design, flattened
+----------------------------------------------------------------------------
+  standard cell area        175324.6 um2
+  cell instances                8777
+  flip flops                    1955
+  inferred latches                 0
+  equivalent NAND2             31059   (sg13g2_nand2_1 is 5.6448 um2)
+
+Multi corner comparison, flattened
+----------------------------------------------------------------------------
+  corner         supply    temp     area um2    cells   flops
+  slow           1.08 V   125 C     175324.6     8777    1955
+  typ            1.20 V    25 C     175324.6     8777    1955
+  fast           1.32 V   -40 C     175324.6     8777    1955
+
+  Area is identical across corners, which is expected: Liberty cell areas
+  are process independent, so only the timing changes. The corner matters
+  for docs/sta_report.txt, not here.
+
+Area per submodule, hierarchical mapping, slow corner
+----------------------------------------------------------------------------
+  module                 area um2  inst   total um2   cells   share
+  vte_cdc_fifo            50966.5     1     50966.5    1600   27.9%
+  vte_frame_sync          44688.6     1     44688.6    1389   24.5%
+  vte_axil_regs           36333.3     1     36333.3    2068   19.9%
+  vte_glyph_rom           15439.3     1     15439.3    1505    8.5%
+  vte_timing_gen          12316.7     1     12316.7    1001    6.7%
+  vte_fetch_engine        11076.3     1     11076.3     712    6.1%
+  vte_shader              10039.8     1     10039.8     667    5.5%
+  vte_mode_lut              362.9     3      1088.6     159    0.6%
+  vte_sync2                  98.0     6       587.9      12    0.3%
+  vga_text_engine             9.1     1         9.1       8    0.0%
+  sum                                      182546.0
+
+  The hierarchical sum is larger than the flattened total because
+  flattening lets the mapper optimise across module boundaries.
+
+Cell histogram, flattened, slow corner
+----------------------------------------------------------------------------
+  cell                       count    area um2
+  sg13g2_dfrbpq_1             1955
+  sg13g2_mux2_1               1317
+  sg13g2_o21ai_1              1096
+  sg13g2_nand2_1               939
+  sg13g2_a21oi_1               602
+  sg13g2_nor2_1                589
+  sg13g2_a22oi_1               456
+  sg13g2_inv_1                 238
+  sg13g2_mux4_1                195
+  sg13g2_nand2b_1              172
+  sg13g2_xnor2_1               164
+  sg13g2_nand3_1               163
+  sg13g2_nor3_1                133
+  sg13g2_and2_1                122
+  sg13g2_a221oi_1              118
+  sg13g2_a21o_1                 98
+  sg13g2_nand4_1                86
+  sg13g2_nor4_1                 63
+  sg13g2_or2_1                  60
+  sg13g2_nor2b_1                59
+  sg13g2_xor2_1                 53
+  sg13g2_and3_1                 40
+  sg13g2_and4_1                 34
+  sg13g2_nand3b_1                9
+  sg13g2_or4_1                   8
+  sg13g2_or3_1                   7
+  sg13g2_buf_1                   1
+
+Checks
+----------------------------------------------------------------------------
+  inferred latches      0   pass
+  black boxes           0   pass
+  unmapped cells        0   pass
+
