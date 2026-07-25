@@ -10,6 +10,14 @@ RTL_DIR := rtl
 TB_DIR  := tb
 RESULTS := results
 JOBS    ?= 8
+PNR_TAG ?= vte
+
+# LibreLane leaves KLAYOUT_DRC_THREADS and KLAYOUT_XOR_THREADS unset, which means the
+# maximal sg13g2 DRC runset goes single threaded and can take longer than every other
+# stage put together. Default to the machine's core count less two, and allow an override
+# for a shared machine: make harden DRC_THREADS=4
+DRC_THREADS ?= $(shell n=$$(nproc 2>/dev/null || echo 4); \
+                       if [ "$$n" -gt 3 ]; then echo $$((n - 2)); else echo 1; fi)
 
 RTL := \
 	$(RTL_DIR)/vte_modes_pkg.sv \
@@ -25,7 +33,7 @@ RTL := \
 	$(RTL_DIR)/vte_axil_regs.sv \
 	$(RTL_DIR)/vga_text_engine.sv
 
-.PHONY: all help venv lint lint-config test synth sta gatesim pdk pnr pnr-report images font clean distclean
+.PHONY: all help venv lint lint-config test synth sta gatesim pdk harden harden-report images font clean distclean
 
 all: lint lint-config test synth sta ## lint, test, synthesise and time (synth and sta need the PDK)
 
@@ -65,11 +73,15 @@ gatesim: venv ## simulate the mapped netlist against the reference renderer (slo
 
 pdk: synth sta gatesim ## the whole silicon flow: area, timing, gate level check
 
-pnr: ## full RTL to GDS with DRC and LVS (needs librelane, takes an hour)
-	librelane --run-tag vte librelane.json
+harden: ## full RTL to GDS with DRC and LVS (needs librelane)
+	@echo "hardening with KLAYOUT_DRC_THREADS=$(DRC_THREADS)"
+	librelane --run-tag $(PNR_TAG) \
+		-c KLAYOUT_DRC_THREADS=$(DRC_THREADS) \
+		-c KLAYOUT_XOR_THREADS=$(DRC_THREADS) \
+		librelane.json
 
-pnr-report: venv ## summarise the place and route run and render the layout
-	$(PY) scripts/pnr_report.py
+harden-report: venv ## summarise the hardened run and render both layout views
+	$(PY) scripts/pnr_report.py --tag $(PNR_TAG)
 
 images: venv ## regenerate every image in docs/img from simulation output
 	$(PY) scripts/make_images.py

@@ -499,8 +499,8 @@ make synth       # Yosys to sg13g2 cells, three corners, docs/pdk_area_report.tx
 make sta         # OpenSTA per video mode and per corner, docs/sta_report.txt
 make gatesim     # simulate the mapped netlist, diff it against the reference renderer
 make pdk         # all three
-make pnr         # full RTL to GDS with LibreLane, DRC and LVS
-make pnr-report  # summarise the run and render docs/img/layout.png
+make harden        # full RTL to GDS with LibreLane, DRC and LVS
+make harden-report # summarise the run and render both layout views
 ```
 
 ### Area
@@ -591,13 +591,25 @@ if a delayed wire has no port to alias.
 
 ### Place and route
 
-`make pnr` takes the RTL all the way to GDS with LibreLane, then `make pnr-report`
+`make harden` takes the RTL all the way to GDS with LibreLane, then `make harden-report`
 summarises it and renders the layout. Constraints are in
 [`pnr/vte.sdc`](pnr/vte.sdc) rather than the flow's generic fallback, because a single
 clock constraint on a two clock design reports meaningless timing. Full report:
 [`docs/pnr_report.txt`](docs/pnr_report.txt).
 
-![routed layout](docs/img/layout.png)
+This is a hardened layout, not a fabricated part: the design is placed, routed and signed
+off against the PDK's rule decks, and has not been taped out.
+
+The whole die. The outline, the pin openings along the top and bottom edges and the
+horizontal power rails read clearly at this scale.
+
+![hardened layout, whole die](docs/img/layout.png)
+
+A 24 micrometre window into the core, where individual `sg13g2` cells are distinguishable:
+standard cell rows separated by the bright power rails, a vertical power strap on the left,
+contacts as small red squares, and the metal routing between cells.
+
+![hardened layout, 24 micrometre detail](docs/img/layout_detail.png)
 
 | | value |
 |---|---|
@@ -620,6 +632,12 @@ documentation: they are exactly `fetch_rdata_i[31:19]`, the reserved bits of the
 and the six AXI protection bits, both of which the README already describes as ignored. The
 flow classes none of them as critical. Three antenna violating nets remain after the
 repair step, which is a manufacturability note for whoever integrates the block.
+
+One practical note for anyone reusing the flow. LibreLane leaves `KLAYOUT_DRC_THREADS` and
+`KLAYOUT_XOR_THREADS` unset, which runs the maximal `sg13g2` DRC runset single threaded. In
+the first run here the two DRC stages took 24m54s and 24m41s, longer than the other 69
+stages put together. The `harden` target now passes a thread count computed from `nproc`
+less two, overridable for a shared machine with `make harden DRC_THREADS=4`.
 
 The interesting result is what happened to the timing. Synthesis said the critical path was
 one minimum size gate driving several hundred loads. Place and route spent **73 282 um2 on
@@ -668,7 +686,8 @@ any realistic system clock satisfies by a wide margin.
 | `docs/pdk_area_report.txt` | committed standard cell area and cell histogram |
 | `docs/sta_report.txt` | committed timing reports including both critical paths |
 | `docs/pnr_report.txt` | committed place and route results, area, checks and timing |
-| `librelane.json`, `pnr/vte.sdc` | place and route configuration and constraints |
+| `librelane.json`, `pnr/vte.sdc` | hardening configuration and constraints |
+| `scripts/pnr_report.py` | hardening summary and the two layout renders |
 | `synth/synth_sg13g2.ys.in` | Yosys script template |
 | `synth/sta.tcl.in` | OpenSTA constraint template |
 

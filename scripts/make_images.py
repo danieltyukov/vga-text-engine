@@ -172,6 +172,22 @@ def do_synth_chart():
 def do_svg():
     out = sh([sys.executable, str(HERE / "make_svg.py")])
     print(out.strip())
+    out = sh([sys.executable, str(HERE / "make_fsm_svg.py")])
+    print(out.strip())
+
+
+def do_layout():
+    """Re-render the layout views from an existing hardened run.
+
+    This does not re-run place and route, which takes far longer than everything else here
+    put together. Run `make harden` first if there is no run to render.
+    """
+    if not sorted((ROOT / "runs").glob("*/final/gds/*.gds")):
+        print("no hardened run found under runs/, skipping the layout render")
+        print("run `make harden` first")
+        return
+    out = sh([sys.executable, str(HERE / "pnr_report.py")])
+    print("\n".join(out.strip().splitlines()[-4:]))
 
 
 TARGETS = {
@@ -180,6 +196,7 @@ TARGETS = {
     "cursor": do_cursor_gif,
     "synth": do_synth_chart,
     "svg": do_svg,
+    "layout": do_layout,
 }
 
 

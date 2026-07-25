@@ -29,19 +29,45 @@ SYNTH_CELL_AREA_UM2 = 175324.6
 RENDER_SCRIPT = r'''# Rendered by scripts/pnr_report.py via klayout -b -rm.
 # Batch mode takes -rd name=value rather than positional arguments.
 #
-# Labels are turned off before the fit: the GDS carries a net name label on every pin and
-# they spill far outside the die outline, which both clutters the picture and makes
-# zoom_fit frame empty space.
+# Two views, because one full die render of a routed 130 nm block is close to unreadable:
+# every metal layer overlaps at that scale and the result is a flat wash of colour.
+#
+#   mode=full    the whole die, so the outline, the pin placement and the power rails read
+#   mode=detail  an explicit zoom_box a few tens of micrometres across, where individual
+#                standard cells and the routing between them are distinguishable
+#
+# Labels are turned off through set_config: assigning the attribute has no effect on the
+# batch path, and the GDS carries a net name label on every pin which both clutters the
+# picture and makes zoom_fit frame empty space.
 import pya
 lv = pya.LayoutView()
 lv.load_layout(gds, 0)
 lv.max_hier()
-# text-visible has to go through set_config; assigning the attribute does not take effect
-# on the batch rendering path.
 lv.set_config("text-visible", "false")
-lv.zoom_fit()
+lv.set_config("grid-visible", "false")
+
+if mode == "detail":
+    bbox = lv.active_cellview().layout().top_cell().dbbox()
+    span = float(span_um)
+    # Offset from the exact centre: the middle of a core often lands on a power strap, and
+    # a slightly off centre window shows more cell rows and less bare metal.
+    cx = bbox.left + bbox.width() * 0.38
+    cy = bbox.bottom + bbox.height() * 0.42
+    aspect = float(w) / float(h)
+    half_x = span * 0.5
+    half_y = half_x / aspect
+    lv.zoom_box(pya.DBox(cx - half_x, cy - half_y, cx + half_x, cy + half_y))
+else:
+    lv.zoom_fit()
+
 lv.save_image(out, int(w), int(h))
 '''
+
+# Views rendered from the final GDS: name, mode, width, height, window size in micrometres.
+VIEWS = [
+    ("layout.png", "full", 1600, 1100, 0.0),
+    ("layout_detail.png", "detail", 1600, 1100, 24.0),
+]
 
 # metric key -> (label, format, unit)
 INTEREST = [
@@ -139,34 +165,42 @@ def disconnected_pins(run):
     return sorted(names)
 
 
-def render_layout(run, out, width=1600, height=1100):
+def render_layout(run, outdir):
+    """Render every view in VIEWS from the run's GDS. Returns the files written."""
     if shutil.which("klayout") is None:
         print("klayout is not on PATH, skipping the layout render")
-        return False
-    gds = [find_gds(run)]
-    if gds[0] is None:
+        return []
+    gds = find_gds(run)
+    if gds is None:
         print("no GDS in the run, skipping the layout render")
-        return False
+        return []
     script = ROOT / "synth" / "out" / "render_gds.py"
     script.parent.mkdir(parents=True, exist_ok=True)
     script.write_text(RENDER_SCRIPT)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    r = subprocess.run(["klayout", "-b", "-rm", str(script),
-                        "-rd", f"gds={gds[0]}", "-rd", f"out={out}",
-                        "-rd", f"w={width}", "-rd", f"h={height}"],
-                       cwd=ROOT, capture_output=True, text=True)
-    if r.returncode != 0 or not out.exists():
-        print(r.stdout + r.stderr)
-        return False
-    print(f"wrote {out}")
-    return True
+    outdir.mkdir(parents=True, exist_ok=True)
+    written = []
+    for name, mode, width, height, span in VIEWS:
+        out = outdir / name
+        r = subprocess.run(["klayout", "-b", "-rm", str(script),
+                            "-rd", f"gds={gds}", "-rd", f"out={out}",
+                            "-rd", f"w={width}", "-rd", f"h={height}",
+                            "-rd", f"mode={mode}", "-rd", f"span_um={span}"],
+                           cwd=ROOT, capture_output=True, text=True)
+        if r.returncode != 0 or not out.exists():
+            print(r.stdout + r.stderr)
+            print(f"failed to render {name}")
+            continue
+        label = "whole die" if mode == "full" else f"{span:.0f} um detail window"
+        print(f"wrote {out}  ({label})")
+        written.append(out)
+    return written
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tag", default="vte")
     ap.add_argument("--report", default=str(ROOT / "docs" / "pnr_report.txt"))
-    ap.add_argument("--image", default=str(ROOT / "docs" / "img" / "layout.png"))
+    ap.add_argument("--imgdir", default=str(ROOT / "docs" / "img"))
     args = ap.parse_args()
 
     run = find_run(args.tag)
@@ -303,7 +337,7 @@ def main():
     out.write_text("\n".join(lines) + "\n")
     print(f"wrote {out}")
 
-    render_layout(run, pathlib.Path(args.image))
+    render_layout(run, pathlib.Path(args.imgdir))
 
     if problems:
         for pr in problems:
