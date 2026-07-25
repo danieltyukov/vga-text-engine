@@ -335,6 +335,14 @@ target the port delivers 50 million cells per second, so the headroom is 8 times
 Outside active video the colour outputs are forced to zero. While disabled, both sync
 pins park at their inactive level for the selected mode.
 
+### Event outputs
+
+`frame_o` and `underrun_o` are one clock wide pulses in the `clk_i` domain, raised when
+the once per frame status sample sees the corresponding pixel domain counter advance.
+They are the same events that set `STATUS.FRAME` and `STATUS.UNDERRUN`, exported for a
+system that would rather take an interrupt than poll. There is no interrupt controller,
+mask or priority: wire them into whatever the rest of the system uses.
+
 ## Parameters
 
 | parameter | default | range | description |
@@ -372,6 +380,13 @@ The same text at 8x16 and at 8x8, cropped out of two RTL frames. The captions ar
 engine's own glyphs, not an annotation added afterwards.
 
 ![8x16 against 8x8](docs/img/font_compare.png)
+
+The full screens the crops come from. Identical 640x480 timing, identical cell buffer
+layout, one register bit apart: 80 by 30 cells at 8x16, 80 by 60 at 8x8.
+
+![8x16 glyph set](docs/img/screen_font_8x16.png)
+
+![8x8 glyph set](docs/img/screen_font_8x8.png)
 
 ### Hardware cursor blinking
 
