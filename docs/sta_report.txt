@@ -1,0 +1,184 @@
+vga_text_engine static timing analysis
+==============================================================================
+
+Tool      : OpenSTA 3.1.0 via OpenROAD
+PDK       : IHP Open PDK SG13G2, 130 nm
+Netlist   : synth/out/netlist_flat_<corner>.v from synth/synth_sg13g2.ys.in
+Script    : synth/sta.tcl.in
+Signoff   : slow corner, 1.08 V, 125 C (slow process, low supply, hot: the setup signoff corner)
+clk_i     : 20.0 ns, 50 MHz, while the pixel domain is measured
+
+These are synthesis level numbers: ideal clock networks, no wire load
+model, and no fanout repair or buffer insertion. Treat them as an upper
+bound on frequency. The two clocks are declared as separate asynchronous
+clock groups, because every path between them is either a gray coded FIFO
+pointer or a single bit through a two flop synchroniser.
+
+Does each video mode close timing? slow corner
+------------------------------------------------------------------------------
+  mode            pixel clk    period  min period      slack   headroom   verdict
+  640x480@60       25.175 M   39.722n     10.420n   +29.302n       281%       MET
+  800x600@60       40.000 M   25.000n     10.420n   +14.580n       140%       MET
+  1024x768@60      65.000 M   15.385n     10.420n    +4.965n        48%       MET
+  720x400@70       28.322 M   35.308n     10.420n   +24.888n       239%       MET
+
+  The pixel domain closes at 95.96 MHz, so every mode in the table
+  has margin. The pixel pipeline is one pixel per clock with no
+  multi-cycle paths, so the critical path does not depend on the mode:
+  the minimum period is the same in every row and only the requirement
+  changes.
+
+Maximum frequency per corner
+------------------------------------------------------------------------------
+  corner         supply    temp     clk_pix     clk_reg
+  slow           1.08 V   125 C    95.96 M    71.26 M
+  typ            1.20 V    25 C   150.27 M   111.17 M
+  fast           1.32 V   -40 C   227.85 M   152.38 M
+
+  clk_reg is the slower of the two, and the reason is load rather than
+  logic depth. See the critical path breakdown below.
+
+Critical paths at the signoff corner, 1024x768
+------------------------------------------------------------------------------
+  worst setup path, pixel domain
+    startpoint      _15040_
+    endpoint        _15039_
+    slack           +4.9640 ns (MET)
+    logic stages    5
+    heaviest stage  _15040_/Q drives 155 loads, 7.3278 ns
+
+  worst setup path, register domain
+    startpoint      _14502_
+    endpoint        _14563_
+    slack           +5.9669 ns (MET)
+    logic stages    3
+    heaviest stage  _11455_/Y drives 419 loads, 11.4990 ns
+
+  Neither path is deep: 5 stages in the pixel domain and 3 in the register domain. In both cases almost all
+  of the delay is a single unbuffered net, 419 loads for 11.50 ns in the register domain and 155 loads
+  for 7.33 ns in the pixel domain. Those are the enables that gate
+  the 295 bit configuration snapshot: the frame boundary handshake
+  updates the whole bundle at once, so one signal reaches several
+  hundred flip flop enable inputs.
+
+  That is what synthesis level timing looks like when no load aware
+  buffering has run: abc picks a minimum size gate and asks it to drive
+  the entire bank. A place and route flow inserts a buffer tree there and
+  the stage collapses, so these frequencies understate what the design
+  does once it is built. They are reported as measured rather than
+  adjusted, and every video mode closes even so.
+
+Full path report, pixel domain, 1024x768, signoff corner
+------------------------------------------------------------------------------
+  Startpoint: rst_pix_ni (input port clocked by clk_pix)
+  Endpoint: _14162_ (recovery check against rising-edge clock clk_pix)
+  Path Group: asynchronous
+  Path Type: max
+  Fanout       Cap      Slew     Delay      Time   Description
+  -------------------------------------------------------------------------------------
+                      0.0000    0.0000    0.0000   clock clk_pix (rise edge)
+                                0.0000    0.0000   clock network delay (ideal)
+                                0.0000    0.0000 ^ input external delay
+     459    2.4383    0.0000    0.0000    0.0000 ^ rst_pix_ni (in)
+                                                   rst_pix_ni (net)
+                      0.0000    0.0000    0.0000 ^ _14162_/RESET_B (sg13g2_dfrbpq_1)
+                                          0.0000   data arrival time
+                      0.0000   15.3846   15.3846   clock clk_pix (rise edge)
+                                0.0000   15.3846   clock network delay (ideal)
+                                0.0000   15.3846   clock reconvergence pessimism
+                                         15.3846 ^ _14162_/CLK (sg13g2_dfrbpq_1)
+                               -0.1993   15.1853   library recovery time
+                                         15.1853   data required time
+  -------------------------------------------------------------------------------------
+                                         15.1853   data required time
+                                         -0.0000   data arrival time
+  -------------------------------------------------------------------------------------
+                                         15.1853   slack (MET)
+  Startpoint: _15040_ (rising edge-triggered flip-flop clocked by clk_pix)
+  Endpoint: _15039_ (rising edge-triggered flip-flop clocked by clk_pix)
+  Path Group: clk_pix
+  Path Type: max
+  Fanout       Cap      Slew     Delay      Time   Description
+  -------------------------------------------------------------------------------------
+                      0.0000    0.0000    0.0000   clock clk_pix (rise edge)
+                                0.0000    0.0000   clock network delay (ideal)
+                      0.0000    0.0000    0.0000 ^ _15040_/CLK (sg13g2_dfrbpq_1)
+     155    1.6402   10.1813    7.3278    7.3278 ^ _15040_/Q (sg13g2_dfrbpq_1)
+                                                   i_fifo.rbin_q[0] (net)
+       3    0.0113    1.5368    1.9240    9.2518 v _09451_/Y (sg13g2_nand4_1)
+                                                   _05125_ (net)
+       2    0.0078    0.4229    0.4750    9.7269 ^ _09458_/Y (sg13g2_nor3_1)
+                                                   _05128_ (net)
+       2    0.0070    0.1571    0.3029   10.0298 ^ _09463_/X (sg13g2_xor2_1)
+                                                   i_fifo.rbin_d[5] (net)
+       1    0.0015    0.0880    0.1675   10.1973 ^ _09464_/Y (sg13g2_xnor2_1)
+                                                   i_fifo.bin2gray$func$rtl/vte_cdc_fifo.sv:112$14184.$result[4] (net)
+                      0.0880    0.0000   10.1973 ^ _15039_/D (sg13g2_dfrbpq_1)
+                                         10.1973   data arrival time
+                      0.0000   15.3846   15.3846   clock clk_pix (rise edge)
+                                0.0000   15.3846   clock network delay (ideal)
+                                0.0000   15.3846   clock reconvergence pessimism
+                                         15.3846 ^ _15039_/CLK (sg13g2_dfrbpq_1)
+                               -0.2233   15.1613   library setup time
+                                         15.1613   data required time
+  -------------------------------------------------------------------------------------
+                                         15.1613   data required time
+                                        -10.1973   data arrival time
+  -------------------------------------------------------------------------------------
+                                          4.9640   slack (MET)
+
+Full path report, register domain, 1024x768, signoff corner
+------------------------------------------------------------------------------
+  Startpoint: rst_ni (input port clocked by clk_reg)
+  Endpoint: _13760_ (recovery check against rising-edge clock clk_reg)
+  Path Group: asynchronous
+  Path Type: max
+  Fanout       Cap      Slew     Delay      Time   Description
+  -------------------------------------------------------------------------------------
+                      0.0000    0.0000    0.0000   clock clk_reg (rise edge)
+                                0.0000    0.0000   clock network delay (ideal)
+                                0.0000    0.0000 ^ input external delay
+     880    4.6747    0.0000    0.0000    0.0000 ^ rst_ni (in)
+                                                   rst_ni (net)
+                      0.0000    0.0000    0.0000 ^ _13760_/RESET_B (sg13g2_dfrbpq_1)
+                                          0.0000   data arrival time
+                      0.0000   20.0000   20.0000   clock clk_reg (rise edge)
+                                0.0000   20.0000   clock network delay (ideal)
+                                0.0000   20.0000   clock reconvergence pessimism
+                                         20.0000 ^ _13760_/CLK (sg13g2_dfrbpq_1)
+                               -0.1993   19.8007   library recovery time
+                                         19.8007   data required time
+  -------------------------------------------------------------------------------------
+                                         19.8007   data required time
+                                         -0.0000   data arrival time
+  -------------------------------------------------------------------------------------
+                                         19.8007   slack (MET)
+  Startpoint: _14502_ (rising edge-triggered flip-flop clocked by clk_reg)
+  Endpoint: _14563_ (rising edge-triggered flip-flop clocked by clk_reg)
+  Path Group: clk_reg
+  Path Type: max
+  Fanout       Cap      Slew     Delay      Time   Description
+  -------------------------------------------------------------------------------------
+                      0.0000    0.0000    0.0000   clock clk_reg (rise edge)
+                                0.0000    0.0000   clock network delay (ideal)
+                      0.0000    0.0000    0.0000 ^ _14502_/CLK (sg13g2_dfrbpq_1)
+       8    0.0222    0.1525    0.3282    0.3282 ^ _14502_/Q (sg13g2_dfrbpq_1)
+                                                   i_frame_sync.i_sync_hold.stage1_q (net)
+     419    1.6832   15.1089   11.4990   11.8272 v _11455_/Y (sg13g2_nand2_1)
+                                                   _06296_ (net)
+       1    0.0015    1.4587    1.5968   13.4240 ^ _11458_/Y (sg13g2_o21ai_1)
+                                                   _00978_ (net)
+                      1.4587    0.0000   13.4240 ^ _14563_/D (sg13g2_dfrbpq_1)
+                                         13.4240   data arrival time
+                      0.0000   20.0000   20.0000   clock clk_reg (rise edge)
+                                0.0000   20.0000   clock network delay (ideal)
+                                0.0000   20.0000   clock reconvergence pessimism
+                                         20.0000 ^ _14563_/CLK (sg13g2_dfrbpq_1)
+                               -0.6092   19.3908   library setup time
+                                         19.3908   data required time
+  -------------------------------------------------------------------------------------
+                                         19.3908   data required time
+                                        -13.4240   data arrival time
+  -------------------------------------------------------------------------------------
+                                          5.9669   slack (MET)
+

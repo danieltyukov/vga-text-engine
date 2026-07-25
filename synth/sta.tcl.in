@@ -1,0 +1,74 @@
+# Copyright 2026 Daniel Tyukov
+# SPDX-License-Identifier: Apache-2.0
+#
+# OpenSTA constraints for vga_text_engine on the IHP SG13G2 standard cell library.
+#
+# Template. scripts/sta_sg13g2.py substitutes the placeholders and writes the result next
+# to the reports so any run can be reproduced by hand:
+#
+#   @LIB@         Liberty file for the corner
+#   @TECH_LEF@    technology LEF, must be read before the netlist
+#   @CELL_LEF@    standard cell LEF
+#   @NETLIST@     gate level netlist from synth/synth_sg13g2.ys.in
+#   @PIX_PERIOD@  pixel clock period in ns, the video mode under test
+#   @REG_PERIOD@  register and fetch clock period in ns
+#   @OUT@         report path
+#
+# The design has two asynchronous clocks. They are declared as separate clock groups so
+# the tool does not try to time a path from one to the other: every crossing between them
+# is either a gray coded FIFO pointer or a single bit through a two flop synchroniser, and
+# timing those as if they were synchronous would report meaningless violations.
+#
+# Both LEF reads have to come before read_verilog, otherwise link_design fails with
+# "no technology has been read".
+
+read_lef @TECH_LEF@
+read_lef @CELL_LEF@
+read_liberty @LIB@
+read_verilog @NETLIST@
+link_design vga_text_engine
+
+create_clock -name clk_pix -period @PIX_PERIOD@ [get_ports clk_pix_i]
+create_clock -name clk_reg -period @REG_PERIOD@ [get_ports clk_i]
+set_clock_groups -asynchronous -group [get_clocks clk_pix] -group [get_clocks clk_reg]
+
+# Inputs and outputs are declared at the clock edge with no external delay budget, so the
+# slack reported is the design's own, not a board level number. remove_from_collection is
+# absent from this build, so the ports are listed explicitly rather than derived by
+# subtracting the clocks from all_inputs.
+set reg_inputs [get_ports {rst_ni s_axil_awaddr_i s_axil_awprot_i s_axil_awvalid_i \
+                           s_axil_wdata_i s_axil_wstrb_i s_axil_wvalid_i s_axil_bready_i \
+                           s_axil_araddr_i s_axil_arprot_i s_axil_arvalid_i \
+                           s_axil_rready_i fetch_gnt_i fetch_rvalid_i fetch_rdata_i}]
+set pix_inputs [get_ports {rst_pix_ni}]
+set reg_outputs [get_ports {s_axil_awready_o s_axil_wready_o s_axil_bresp_o \
+                            s_axil_bvalid_o s_axil_arready_o s_axil_rdata_o \
+                            s_axil_rresp_o s_axil_rvalid_o fetch_req_o fetch_addr_o \
+                            frame_o underrun_o}]
+set pix_outputs [get_ports {hsync_o vsync_o de_o red_o green_o blue_o}]
+
+set_input_delay 0.0 -clock clk_reg $reg_inputs
+set_input_delay 0.0 -clock clk_pix $pix_inputs
+set_output_delay 0.0 -clock clk_reg $reg_outputs
+set_output_delay 0.0 -clock clk_pix $pix_outputs
+
+report_units
+report_design_area
+
+puts "=== worst setup path, whole design ==="
+report_checks -path_delay max -digits 4
+
+puts "=== worst setup path, pixel domain ==="
+report_checks -path_delay max -to [get_clocks clk_pix] -digits 4 -fields {slew capacitance fanout net}
+
+puts "=== worst setup path, register domain ==="
+report_checks -path_delay max -to [get_clocks clk_reg] -digits 4 -fields {slew capacitance fanout net}
+
+puts "=== slack summary ==="
+puts "clk_pix period @PIX_PERIOD@ ns"
+puts "clk_reg period @REG_PERIOD@ ns"
+report_worst_slack -max -digits 4
+report_tns -digits 4
+
+puts "=== per clock ==="
+report_clock_min_period
