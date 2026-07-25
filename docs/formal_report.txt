@@ -18,6 +18,9 @@ given to the solver; the other 274 bits of the bundle do not reach this module.
 The harness contains no assume statements, so it cannot over constrain the
 design and a vacuous proof is impossible by construction.
 
+Verdicts and cycle counts are reproducible; the times are wall clock from the
+run that wrote this file, so re-running make formal moves them and nothing else.
+
 Properties
 ----------------------------------------------------------------------------
   P1  the horizontal counter never leaves its own total
@@ -34,7 +37,7 @@ Result
   assertions       8 for 7 properties, P6 being two comparisons
   engine           ABC PDR, property directed reachability
   verdict          PROVED
-  time             1.02 s
+  time             0.61 s
   invariant        75 clauses over 40 of 70 flops, found at frame 42
 
   PDR returning an inductive invariant is an unbounded proof: the
@@ -50,10 +53,10 @@ Reachability, so the proof is not vacuous
   rather than a shortest path.
 
   state                       verdict                         time
-  data enable                 reached at cycle 28147         5.52 s
-  prefetch window             reached at cycle 28139         6.87 s
+  data enable                 reached at cycle 28147         4.00 s
+  prefetch window             reached at cycle 28139         4.37 s
   hsync pulse active          reached at cycle 3             0.05 s
-  text grid painted           reached at cycle 28147         6.31 s
+  text grid painted           reached at cycle 28147         5.14 s
 
   All four occur, so the assertions above are constraining real behaviour
   rather than holding because the state never arises.

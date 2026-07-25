@@ -172,6 +172,9 @@ def main():
     L.append("The harness contains no assume statements, so it cannot over constrain the")
     L.append("design and a vacuous proof is impossible by construction.")
     L.append("")
+    L.append("Verdicts and cycle counts are reproducible; the times are wall clock from the")
+    L.append("run that wrote this file, so re-running make formal moves them and nothing else.")
+    L.append("")
 
     L.append("Properties")
     L.append("-" * 76)
