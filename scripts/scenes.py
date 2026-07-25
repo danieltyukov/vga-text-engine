@@ -165,7 +165,7 @@ class Scene:
 
 def scene_demo():
     s = Scene("demo", mode=0, cols=80, rows=30, font_h16=True, border=1,
-              cur_en=True, cur_col=13, cur_row=26, cur_div=15, txt_div=15)
+              cur_en=True, cur_col=8, cur_row=26, cur_div=15, txt_div=15)
     s.box(0, 0, 80, 30, fg=11)
     s.text(0, 3, " vga_text_engine ", fg=15, bg=1)
     s.text(2, 3, "Colour VGA text mode display controller", fg=14)
@@ -197,7 +197,7 @@ def scene_demo():
     s.fill(23, 40, 6, cell(G_HALF_LEFT, 14, 4))
     s.fill(23, 50, 6, cell(G_HALF_LOW, 10, 2))
 
-    s.text(26, 3, "vte> _", fg=15)
+    s.text(26, 3, "vte> ", fg=15)
     s.text(28, 3, "Apache-2.0  Daniel Tyukov 2026", fg=8)
     return s
 
@@ -214,7 +214,7 @@ def scene_palette():
         s.text(row, 2, f"fg{fg:2d}", fg=fg if fg else 8)
         for bg in range(16):
             s.text(row, 10 + bg * 4, "Ab", fg=fg, bg=bg)
-    s.text(21, 2, "PROGRAMMED RAMP (palette rewritten below index 8 is untouched)", fg=15)
+    s.text(21, 2, "SOLID BLOCKS AND A 50 PERCENT SHADE OVER THE COMPLEMENT INDEX", fg=15)
     for i in range(16):
         s.fill(23, 2 + i * 4, 4, cell(G_BLOCK, i, 0))
     for i in range(16):
