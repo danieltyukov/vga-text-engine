@@ -340,6 +340,7 @@ faster than `clk_pix_i / 1000`.
 | the parameterisation has rotted | a second parameter set is linted on every run |
 | synthesis changes behaviour | the mapped netlist renders a frame and is diffed against the reference renderer |
 | a video mode is listed but unreachable | per mode static timing analysis at the slow corner |
+| a configuration no test happens to use breaks the sync generator | the properties are proved over every reachable state and every legal configuration, `make formal` |
 
 ### Independence
 
@@ -365,8 +366,12 @@ constants and both polarities from the table at elaboration time.
 
 Stated plainly rather than left to be discovered:
 
-- No formal property checking. The alignment invariant is argued in this document and
-  tested at frame granularity, not proved.
+- Formal proof covers the sync generator only. `make formal` proves seven properties of
+  `vte_timing_gen` over every reachable state and every legal configuration, which is what
+  justifies the counter wrap tests and the placement of the prefetch window. The alignment
+  invariant that spans the fetch engine, the elastic buffer and the shader is argued in this
+  document and tested at frame granularity, not proved, and neither is anything about the
+  pixel values.
 - No post layout simulation. Gate level simulation runs on the pre layout mapped netlist
   with zero delay cell models, so it proves function, not timing. Timing comes from static
   analysis, before and after routing.

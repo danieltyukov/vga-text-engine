@@ -31,8 +31,10 @@ on every test run.
 - [Parameters](#parameters)
 - [Gallery](#gallery)
 - [Verification](#verification)
+- [Formal proof](#formal-proof)
 - [Silicon](#silicon)
 - [Repository layout](#repository-layout)
+- [Adapting and contributing](#adapting-and-contributing)
 - [Licence](#licence)
 
 ## Features
@@ -53,7 +55,7 @@ Compared with a plain monochrome fixed font text controller:
 | Clocking | single clock | separate register and pixel clocks with a proper gray coded crossing |
 | Text grid | fixed | columns and rows programmable, clamped to the active area, border colour outside the grid |
 | Register interface | ad hoc | AXI4-Lite subordinate with byte strobes and an exhaustively tested map |
-| Verification | visual inspection | pixel exact against an independent renderer, at RTL and at the gate level |
+| Verification | visual inspection | pixel exact against an independent renderer, at RTL and at the gate level, plus the sync generator proved over every reachable state |
 | Physical evidence | none | real 130 nm standard cell area and per mode timing closure on an open PDK |
 
 ## Architecture
@@ -409,13 +411,15 @@ two frames, and `TXT_DIV = 3`, so the blinking attribute flips every four.
 make venv     # once, creates .venv and installs pillow, numpy and matplotlib
 make lint     # Verilator -Wall, no warnings allowed
 make test     # build and run everything
+make formal   # prove the sync generator properties
 make images   # regenerate docs/img from simulation output
-make all      # lint both parameter sets, test, synthesise, time
+make all      # lint both parameter sets, test, prove, synthesise, time
 ```
 
-Toolchain: Icarus Verilog 12.0, Verilator 5.020, Yosys 0.33, OpenSTA 3.1.0 through
-OpenROAD, Python 3.12, and the IHP Open PDK SG13G2. The RTL is written in a SystemVerilog
-subset every one of those tools reads, so nothing here needs a commercial licence.
+Toolchain: Icarus Verilog 12.0, Verilator 5.020, Yosys 0.33 with ABC 1.01, OpenSTA 3.1.0
+through OpenROAD, LibreLane with Magic and KLayout, Python 3.12, and the IHP Open PDK
+SG13G2. The RTL is written in a SystemVerilog subset every one of those tools reads, so
+nothing here needs a commercial licence.
 
 Fourteen cases, all passing, about 160 seconds of wall clock at `-j 8`:
 
@@ -486,6 +490,65 @@ vvp results/sim/tb_vte_frame.vvp \
 `+ascii` prints the first 32 captured lines as coarse art, which is usually enough to
 spot a pipeline problem without opening a waveform viewer.
 
+## Formal proof
+
+A captured frame proves the renderer is right for that frame. `make formal` proves seven
+properties of the sync generator for **every reachable state and every legal
+configuration**, which includes the twelve mode indices that fall outside the table and grid
+sizes larger than any mode can display: cases no captured frame reaches. Full report:
+[`docs/formal_report.txt`](docs/formal_report.txt), harness in
+[`fv/fv_timing_gen.sv`](fv/fv_timing_gen.sv).
+
+| | property |
+|---|---|
+| P1, P2 | neither position counter ever leaves its own total |
+| P3, P4 | data enable is never asserted during either sync pulse |
+| P5 | the text grid is never painted outside active video |
+| P6 | the character prefetch window lies entirely inside the line |
+| P7 | the glyph row index never exceeds the height of the selected font |
+
+The configuration is an `anyconst` snapshot: the solver picks the mode index, the column and
+row counts and the glyph height freely, and they then hold, which is exactly the contract
+`vte_frame_sync` implements by snapshotting the configuration once per frame. One proof
+therefore covers all 16 mode indices, all 65 536 column and row combinations and both glyph
+heights at once.
+
+Result: **8 assertions proved**, two of them the halves of P6, by ABC's PDR engine on a
+70 flop, 2209 gate model in about a second, with an inductive invariant of 75 clauses over
+40 of the 70 flops. An inductive invariant is an unbounded proof, so the properties hold in
+every reachable state rather than to some depth.
+
+Two things keep that from being a hollow result. The harness contains **no assume
+statements at all**, so it cannot over constrain the design. And each interesting state is
+separately shown to be reachable, by rebuilding the same harness with that state asserted
+false and letting ABC find the trace:
+
+| state | reached at cycle |
+|---|---|
+| an active horizontal sync pulse | 3 |
+| the character prefetch window | 28 139 |
+| data enable | 28 147 |
+| a painted text grid cell | 28 147 |
+
+Those depths are the ones the mode table predicts, which is a check in itself: 640x480 is the
+shallowest mode and spends `(2 + 33)` blanking lines of 800 pixels plus `96 + 48` pixels of
+horizontal blanking before the first active pixel, so 28 144 pixel clocks plus the reset
+release. The prefetch window opens exactly 8 cycles earlier, which is the eight pixel lead.
+Bounded model checking cannot unroll that far, so the engine for these runs is ABC `sim3`,
+random simulation with SAT based state jumping; only the positive direction is used, since a
+trace proves a state occurs and a miss would prove nothing.
+
+What is not proved: the pixel values. Nothing here says the right glyph or the right colour
+comes out, which is what the pixel exact comparison against the reference renderer is for.
+The elastic buffer, the fetch engine, the register file and the clock domain crossing are
+covered by simulation only.
+
+The flow is Yosys and ABC driven directly rather than SymbiYosys, because on this machine
+z3 4.8.12 never gets past the step 0 assumption check on this model, this boolector build
+exits without returning a status, and `sby`'s own ABC engine runs the proof but then crashes
+parsing the witness. `fv/vte_timing_gen.ys.in` is the Yosys half that `sby` would have
+generated.
+
 ## Silicon
 
 The design is synthesised, timed, gate level simulated and taken all the way to GDS with
@@ -502,6 +565,27 @@ make pdk         # all three
 make harden        # full RTL to GDS with LibreLane, DRC and LVS
 make harden-report # summarise the run and render both layout views
 ```
+
+Two different stages produce numbers here and they are not interchangeable, so the headline
+figures are labelled with the stage they came from before anything else:
+
+| quantity | stage | value |
+|---|---|---|
+| standard cell area | post synthesis, mapped netlist | 175 325 um2 |
+| standard cell area | post route | 269 975 um2, 1.54x |
+| core area, cells plus fill | post route | 447 681 um2 |
+| **die area** | **post route** | **476 640 um2, 0.477 mm2** |
+| core utilisation | post route | 60.3 percent |
+| instances | post route | 34 905 including fill |
+| worst setup slack, 65 MHz pixel clock, slow corner | post synthesis | +4.965 ns |
+| worst setup slack, 65 MHz pixel clock, slow corner | post route | +7.585 ns |
+| `clk_pix_i` Fmax, slow corner | post synthesis | 95.96 MHz |
+| Magic DRC, KLayout DRC, LVS errors | post route signoff | 0, 0, 0 |
+| total power at 65 MHz | post route | 10.5 mW |
+
+The die is 1.77x the post route cell area and 2.72x the synthesis estimate, which is what
+filler, tap cells, the power grid and the routing tracks cost. Quote the die area if only
+one number is quoted.
 
 ### Area
 
@@ -537,19 +621,32 @@ becomes one memory block and 8.5 percent of the area disappears.
 
 ### Timing
 
-OpenSTA through OpenROAD, slow corner. Full report including both critical paths:
-[`docs/sta_report.txt`](docs/sta_report.txt).
+Every row below is measured, not asserted: OpenSTA 3.1.0 through OpenROAD, run once per
+mode on the mapped `sg13g2` netlist at the slow signoff corner, 1.08 V, 125 C, slow process.
+`make sta` reproduces the table and writes
+[`docs/sta_report.txt`](docs/sta_report.txt), which carries both critical paths in full.
 
-| mode | pixel clock needed | minimum period | slack | headroom | verdict |
+**Measured at the slow corner, 1.08 V, 125 C, post synthesis:**
+
+| mode | pixel clock needed | measured minimum period | measured slack | headroom | verdict |
 |---|---|---|---|---|---|
 | 640x480@60 | 25.175 MHz | 10.420 ns | +29.302 ns | 3.8x | met |
 | 800x600@60 | 40.000 MHz | 10.420 ns | +14.580 ns | 2.4x | met |
 | 1024x768@60 | 65.000 MHz | 10.420 ns | +4.965 ns | 1.5x | met |
 | 720x400@70 | 28.322 MHz | 10.420 ns | +24.888 ns | 3.4x | met |
 
-Every mode in the table closes at the slow corner. The pixel pipeline is one pixel per
-clock with no multi-cycle paths, so the critical path does not depend on the mode: the
-minimum period is the same in every row and only the requirement changes.
+All four modes close at the slow corner, which is the corner that decides setup. The
+measured 10.420 ns minimum period is the same in every row because the pixel pipeline is one
+pixel per clock with no multi-cycle paths, so the critical path does not depend on the mode
+and only the requirement changes. That single measurement is the 95.96 MHz pixel domain
+figure below, and it is what makes each per mode verdict a measurement rather than a claim:
+65 MHz is the fastest requirement in the table and it clears by 4.965 ns. The slack column
+is the required period less the measured minimum period; OpenSTA reports the worst path of
+that same run at +4.9640 ns, the picosecond of difference being rounding in the minimum
+period.
+
+Place and route improves all four, and the same 1024x768 corner ends at +7.585 ns; see
+[Place and route](#place-and-route).
 
 ![timing closure per mode](docs/img/fmax_modes.png)
 
@@ -672,6 +769,8 @@ any realistic system clock satisfies by a wide margin.
 | `rtl/vte_glyph_rom.sv` | generated dual bank glyph ROM |
 | `rtl/vte_sync2.sv` | two stage synchroniser |
 | `tb/` | testbenches and the AXI4-Lite manager tasks |
+| `fv/fv_timing_gen.sv` | formal harness for the sync generator |
+| `fv/vte_timing_gen.ys.in` | Yosys script template that builds the formal model |
 | `scripts/font_data.py` | hand authored 8x8 and 8x16 bitmaps, the single source of truth |
 | `scripts/model.py` | independent Python reference renderer |
 | `scripts/modes.py` | VESA figures, written out independently of the RTL |
@@ -682,7 +781,10 @@ any realistic system clock satisfies by a wide margin.
 | `scripts/synth_sg13g2.py` | synthesis to real standard cells, area report and chart |
 | `scripts/sta_sg13g2.py` | per mode and per corner static timing analysis |
 | `scripts/gatesim.py` | gate level simulation of the mapped netlist |
+| `scripts/formal_report.py` | drives the proof and the reachability runs |
 | `docs/design.md` | microarchitecture decisions, buffer sizing maths, verification plan |
+| `docs/ADAPTING.md` | how to resize the grid, change DAC widths, add a mode, swap the font |
+| `docs/formal_report.txt` | committed proof result, properties and reachability |
 | `docs/pdk_area_report.txt` | committed standard cell area and cell histogram |
 | `docs/sta_report.txt` | committed timing reports including both critical paths |
 | `docs/pnr_report.txt` | committed place and route results, area, checks and timing |
@@ -693,6 +795,22 @@ any realistic system clock satisfies by a wide margin.
 
 The glyph ROM is generated. After editing `scripts/font_data.py`, run `make font` to
 regenerate `rtl/vte_glyph_rom.sv`.
+
+## Adapting and contributing
+
+The block is meant to be forked and changed, so the four changes people actually make each
+have a walkthrough listing every file involved and what fails if one is missed:
+
+- **[`docs/ADAPTING.md`](docs/ADAPTING.md)** covers resizing the text grid at runtime and
+  past the 255 cell register limit, changing the DAC widths, adding a video mode to the
+  timing package, and swapping the font ROM for other bitmaps or for a real memory macro.
+- **[`CONTRIBUTING.md`](CONTRIBUTING.md)** covers what a patch has to satisfy, the
+  SystemVerilog subset all three open tools read, and the style the RTL follows.
+
+Adding a video mode is deliberately the smallest of the four: one `localparam` in
+`rtl/vte_modes_pkg.sv` and one case arm in `rtl/vte_mode_lut.sv`, and the elaboration time
+table check, the conformance test and the per mode timing analysis all pick it up on their
+own.
 
 ## Licence
 
