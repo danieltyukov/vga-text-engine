@@ -178,8 +178,11 @@ def main():
         print("\nFAILED: testbench compilation")
         return 1
 
+    # Derived from scripts/modes.py rather than hardcoded, so adding a video mode there
+    # and in rtl/vte_modes_pkg.sv is enough to get a conformance case for it.
+    import modes
     cases = []
-    for m in range(4):
+    for m in [d["index"] for d in modes.MODES]:
         cases.append((f"timing/mode{m}", lambda m=m: case_timing(m)))
     for s in FRAME_SCENES:
         cases.append((f"frame/{s}", lambda s=s: case_frame(s)))
