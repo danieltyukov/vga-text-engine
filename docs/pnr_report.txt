@@ -13,7 +13,8 @@ Physical
 ----------------------------------------------------------------------------
   die area                          476640 um2
   core area                         447681 um2
-  cell area                         447681 um2
+  standard cell area                269975 um2
+  cells plus fill                   447681 um2
   core utilisation                   0.603 
   instances                          34905 
   total wire length                 577240 um

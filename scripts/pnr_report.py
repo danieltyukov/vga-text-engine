@@ -47,7 +47,8 @@ lv.save_image(out, int(w), int(h))
 INTEREST = [
     ("design__die__area", "die area", "{:.0f}", "um2"),
     ("design__core__area", "core area", "{:.0f}", "um2"),
-    ("design__instance__area", "cell area", "{:.0f}", "um2"),
+    ("design__instance__area__stdcell", "standard cell area", "{:.0f}", "um2"),
+    ("design__instance__area", "cells plus fill", "{:.0f}", "um2"),
     ("design__instance__utilization", "core utilisation", "{:.3f}", ""),
     ("design__instance__count", "instances", "{:.0f}", ""),
     ("route__wirelength", "total wire length", "{:.0f}", "um"),
