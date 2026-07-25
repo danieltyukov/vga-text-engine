@@ -22,6 +22,8 @@
 //
 // Back to back issue is allowed: a new req_o may go out in the same cycle rvalid_i
 // returns the previous one, so a zero wait state target sustains one cell per clock.
+// Issuing is gated on the elastic buffer having room for the in flight response plus
+// the new one, so no fetched cell is ever dropped.
 
 module vte_fetch_engine #(
     parameter int unsigned FetchAddrW = 32
@@ -44,7 +46,9 @@ module vte_fetch_engine #(
     // Elastic buffer write side.
     output logic                      fifo_wr_o,
     output logic [vte_pkg::CellW-1:0] fifo_data_o,
-    input  logic                      fifo_full_i
+    // High when the buffer has fewer than two free slots, which is the point at
+    // which a new request could no longer be guaranteed a home.
+    input  logic                      fifo_afull_i
 );
 
   vte_modes_pkg::mode_t mode;
@@ -88,9 +92,14 @@ module vte_fetch_engine #(
   logic [FetchAddrW-1:0] row_bytes;
   logic accept, last_col, last_line, last_row;
 
-  assign row_bytes = {{(FetchAddrW - 11) {1'b0}}, cols_eff, 2'b00};
+  // Row stride is the programmed column count, not the clamped one, so the buffer
+  // layout stays fixed even when the grid is wider than the active area.
+  assign row_bytes = {{(FetchAddrW - 10) {1'b0}}, cfg_i.cols, 2'b00};
 
-  assign req_o     = run_i && !done_q && !fifo_full_i && (!outstanding_q || rvalid_i);
+  // A request is only offered when the buffer can hold both the response already in
+  // flight and the response this request will produce. Checking plain "not full" here
+  // would let a response arrive at a full buffer and be dropped.
+  assign req_o     = run_i && !done_q && !fifo_afull_i && (!outstanding_q || rvalid_i);
   assign addr_o    = addr_q;
   assign accept    = req_o && gnt_i;
 

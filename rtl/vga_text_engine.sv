@@ -98,7 +98,7 @@ module vga_text_engine #(
   logic fetch_run;
   logic frame_evt, underrun_evt, running, vblank_reg;
 
-  logic fifo_wr, fifo_full, fifo_pop, fifo_empty, fifo_drain;
+  logic fifo_wr, fifo_full, fifo_afull, fifo_pop, fifo_empty, fifo_drain;
   logic [vte_pkg::CellW-1:0] fifo_wdata, fifo_rdata;
   logic [$clog2(FifoDepth):0] fifo_level;
 
@@ -221,7 +221,7 @@ module vga_text_engine #(
       .rdata_i    (fetch_rdata_i),
       .fifo_wr_o  (fifo_wr),
       .fifo_data_o(fifo_wdata),
-      .fifo_full_i(fifo_full)
+      .fifo_afull_i(fifo_afull)
   );
 
   vte_cdc_fifo #(
@@ -233,6 +233,7 @@ module vga_text_engine #(
       .wr_en_i   (fifo_wr),
       .wr_data_i (fifo_wdata),
       .wr_full_o (fifo_full),
+      .wr_afull_o(fifo_afull),
       .wr_level_o(fifo_level),
       .clk_rd_i  (clk_pix_i),
       .rst_rd_ni (rst_pix_ni),
@@ -300,7 +301,7 @@ module vga_text_engine #(
   );
 
   logic unused;
-  assign unused = ^{hcnt, vcnt, dim_h0, dim_h1, dim_h2, dim_h3, dim_v0, dim_v1, dim_v2, dim_v3,
+  assign unused = ^{hcnt, vcnt, fifo_full, dim_h0, dim_h1, dim_h2, dim_h3, dim_v0, dim_v1, dim_v2, dim_v3,
                     dim_mode.h_front, dim_mode.h_sync, dim_mode.h_back, dim_mode.v_front,
                     dim_mode.v_sync, dim_mode.v_back, dim_mode.h_pos, dim_mode.v_pos};
 

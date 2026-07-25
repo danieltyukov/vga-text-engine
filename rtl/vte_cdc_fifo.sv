@@ -12,8 +12,8 @@
 //
 // wr_level_o is an occupancy estimate in the write domain. It is conservative: the
 // read pointer it compares against is up to two write clocks stale, so the reported
-// level is never lower than the true level. That is the safe direction for a
-// software watermark.
+// level is never lower than the true level. That is the safe direction both for a
+// software watermark and for the wr_afull_o slot reservation.
 
 module vte_cdc_fifo #(
     parameter int unsigned Width = 19,
@@ -26,6 +26,7 @@ module vte_cdc_fifo #(
     input  logic             wr_en_i,
     input  logic [Width-1:0] wr_data_i,
     output logic             wr_full_o,
+    output logic             wr_afull_o,
     output logic [    PtrW:0] wr_level_o,
     // Read domain
     input  logic             clk_rd_i,
@@ -96,6 +97,12 @@ module vte_cdc_fifo #(
   // wrap test.
   assign wr_full_o = (wgray_q == {~rgray_in_wr[PtrW:PtrW-1], rgray_in_wr[PtrW-2:0]});
   assign wr_level_o = wbin_q - rbin_in_wr;
+
+  // Fewer than two slots free. A producer with a read in flight must reserve a slot
+  // for the response it is already owed before offering another request, otherwise
+  // the response can land on a full buffer and be dropped, which would silently
+  // shift the whole cell stream.
+  assign wr_afull_o = (wr_level_o >= (PtrW + 1)'(Depth - 1));
 
   // ---------------------------------------------------------------------------
   // Read side
