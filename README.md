@@ -548,7 +548,11 @@ trace proves a state occurs and a miss would prove nothing.
 What is not proved: the pixel values. Nothing here says the right glyph or the right colour
 comes out, which is what the pixel exact comparison against the reference renderer is for.
 The elastic buffer, the fetch engine, the register file and the clock domain crossing are
-covered by simulation only.
+covered by simulation only. Nor is reset applied mid operation: the harness releases reset
+once and never asserts it again, which is how the block is used and what lets the proof
+finish, and `async2sync` rewrites the asynchronous resets into synchronous form for the
+model. Reset recovery and removal timing is a static timing question and it is in
+[`docs/sta_report.txt`](docs/sta_report.txt).
 
 The flow is Yosys and ABC driven directly rather than SymbiYosys, because on this machine
 z3 4.8.12 never gets past the step 0 assumption check on this model, this boolector build

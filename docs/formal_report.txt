@@ -37,7 +37,7 @@ Result
   assertions       8 for 7 properties, P6 being two comparisons
   engine           ABC PDR, property directed reachability
   verdict          PROVED
-  time             0.61 s
+  time             0.60 s
   invariant        75 clauses over 40 of 70 flops, found at frame 42
 
   PDR returning an inductive invariant is an unbounded proof: the
@@ -53,10 +53,10 @@ Reachability, so the proof is not vacuous
   rather than a shortest path.
 
   state                       verdict                         time
-  data enable                 reached at cycle 28147         4.00 s
-  prefetch window             reached at cycle 28139         4.37 s
-  hsync pulse active          reached at cycle 3             0.05 s
-  text grid painted           reached at cycle 28147         5.14 s
+  data enable                 reached at cycle 28147         3.46 s
+  prefetch window             reached at cycle 28139         3.47 s
+  hsync pulse active          reached at cycle 3             0.03 s
+  text grid painted           reached at cycle 28147         3.46 s
 
   All four occur, so the assertions above are constraining real behaviour
   rather than holding because the state never arises.
@@ -85,4 +85,11 @@ What this does and does not establish
   right colour comes out, which is what the pixel exact comparison against the
   reference renderer is for. The elastic buffer, the fetch engine, the register
   file and the clock domain crossing are covered by simulation only.
+
+  Also not established: anything about reset applied mid operation. The harness
+  releases reset once from a counter and never asserts it again, which is how
+  the block is used and which is what makes the proof finish, and async2sync
+  rewrites the design's asynchronous resets into synchronous form for the model.
+  Recovery and removal timing on the reset itself is a static timing question,
+  and it is in docs/sta_report.txt.
 

@@ -247,6 +247,13 @@ def main():
     L.append("  reference renderer is for. The elastic buffer, the fetch engine, the register")
     L.append("  file and the clock domain crossing are covered by simulation only.")
     L.append("")
+    L.append("  Also not established: anything about reset applied mid operation. The harness")
+    L.append("  releases reset once from a counter and never asserts it again, which is how")
+    L.append("  the block is used and which is what makes the proof finish, and async2sync")
+    L.append("  rewrites the design's asynchronous resets into synchronous form for the model.")
+    L.append("  Recovery and removal timing on the reset itself is a static timing question,")
+    L.append("  and it is in docs/sta_report.txt.")
+    L.append("")
 
     out_path = pathlib.Path(args.report)
     out_path.parent.mkdir(parents=True, exist_ok=True)
