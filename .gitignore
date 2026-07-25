@@ -1,0 +1,17 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Simulation artifacts
+sim_build/
+results/
+*.vcd
+*.fst
+*.vvp
+obj_dir/
+*.log
+
+# Synthesis intermediates
+synth/*.json
+synth/*.v
