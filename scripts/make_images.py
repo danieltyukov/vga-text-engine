@@ -176,6 +176,15 @@ def do_svg():
     print(out.strip())
 
 
+def do_schematic():
+    """The elaborated top level, laid out by netlistsvg from the Yosys netlist."""
+    import shutil
+    if shutil.which("netlistsvg") is None:
+        print("netlistsvg is not installed, skipping the generated schematic")
+        return
+    print(sh([sys.executable, str(HERE / "make_schematic.py")]).strip())
+
+
 def do_layout():
     """Re-render the layout views from an existing hardened run.
 
@@ -196,6 +205,7 @@ TARGETS = {
     "cursor": do_cursor_gif,
     "synth": do_synth_chart,
     "svg": do_svg,
+    "schematic": do_schematic,
     "layout": do_layout,
 }
 
