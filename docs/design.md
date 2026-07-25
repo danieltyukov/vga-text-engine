@@ -11,6 +11,7 @@ and the verification plan. The register map and the interface contracts live in 
 - [Elastic buffer sizing](#elastic-buffer-sizing)
 - [Clock domain crossing](#clock-domain-crossing)
 - [Verification plan](#verification-plan)
+- [What the silicon says](#what-the-silicon-says)
 - [SystemVerilog subset](#systemverilog-subset)
 - [Known limitations](#known-limitations)
 
@@ -335,8 +336,10 @@ faster than `clk_pix_i / 1000`.
 | a sticky flag cannot be cleared or clears itself | write one to clear, then a zero write, then three more frames |
 | the memory stalls and takes the sync with it | hsync period measured across the whole starvation window |
 | the picture never recovers from an underrun | post recovery frame compared pixel exact |
-| a latch is inferred | the synthesis report fails on any `$_DLATCH_` cell |
+| a latch is inferred | the area report fails on any latch cell in the mapped netlist |
 | the parameterisation has rotted | a second parameter set is linted on every run |
+| synthesis changes behaviour | the mapped netlist renders a frame and is diffed against the reference renderer |
+| a video mode is listed but unreachable | per mode static timing analysis at the slow corner |
 
 ### Independence
 
@@ -364,14 +367,80 @@ Stated plainly rather than left to be discovered:
 
 - No formal property checking. The alignment invariant is argued in this document and
   tested at frame granularity, not proved.
-- No gate level simulation. Synthesis is a smoke test for latches and black boxes; it is
-  not followed by a netlist simulation.
+- No post layout simulation. Gate level simulation runs on the mapped netlist with zero
+  delay cell models, so it proves function, not timing. Timing comes from static analysis.
+- Static timing analysis is at synthesis level: ideal clocks, no wire load model, no
+  fanout repair. The frequencies are load limited by unbuffered high fanout enables and
+  would improve after place and route.
+- Gate level simulation covers one frame of one scene, not the whole scene catalogue. It
+  takes roughly a hundred times longer than the RTL run.
 - No metastability injection. The synchronisers are structurally standard but the
   testbench cannot exercise a genuinely asynchronous sample.
 - Frames are compared at a handful of blink phases, not at every phase of every divider.
   The blink test covers the phase arithmetic separately over sixteen consecutive frames.
 - The `CTRL.MODE` change while enabled is documented as producing one malformed frame and
   is not tested, because the malformed frame is the specified behaviour.
+
+## What the silicon says
+
+The design is taken through synthesis, static timing analysis and gate level simulation on
+the IHP Open PDK SG13G2, an open source 130 nm BiCMOS process. Three things came out of
+that which are worth recording as design feedback rather than just as numbers.
+
+### Atomic reconfiguration costs about a quarter of the area
+
+`vte_frame_sync` is 44 689 um2 of the 182 546 um2 hierarchical total, and almost all of it
+is flip flops: two extra copies of the 295 bit configuration bundle, one frozen shadow in
+the register domain and one live in the pixel domain. Together with the elastic buffer,
+which is another 50 966 um2 of flip flops because a 130 nm standard cell library has no
+small dual port RAM, storage is 52 percent of the design.
+
+That is the honest price of the guarantee in the handshake section: software never sees a
+torn frame. A cheaper design would let the pixel domain read the live registers and accept
+a corrupted frame whenever a write straddled the boundary. Knowing the cost is a quarter of
+the area makes that a real engineering choice rather than an assumption.
+
+### The critical path is load, not logic
+
+Both worst paths are only a few gates deep, and almost all of the delay is a single
+unbuffered net:
+
+| domain | stages | heaviest net | fanout | delay |
+|---|---|---|---|---|
+| register | 3 | hold line of the frame handshake | 419 | 11.50 ns |
+| pixel | 5 | pixel side snapshot enable | 155 | 7.33 ns |
+
+Those are exactly the signals that make the configuration update atomic: one enable
+reaching every flip flop of the bundle at once. Synthesis level mapping does no load aware
+buffering, so `abc` picks a minimum size gate and asks it to drive the whole bank. A place
+and route flow inserts a buffer tree and the stage collapses.
+
+The design implication is not "fix the RTL". It is that the frequency this design reaches
+depends on buffering rather than on restructuring logic, which is the easy kind of
+dependency: no pipeline stage has to be added, and the numbers already clear every video
+mode at the slow corner.
+
+### Every video mode is a verified claim
+
+The mode table used to be a list of numbers the sync generator reproduces. It is now also a
+statement about frequency: at the slow corner the pixel domain closes at 95.96 MHz, so
+1024x768 at 65 MHz has 1.5x margin and the other three have 2.4x or more. The pixel
+pipeline is one pixel per clock with no multi-cycle paths, so the critical path is the same
+in every mode and only the requirement changes.
+
+### Gate level simulation replaces a structural argument
+
+The earlier version of this document leaned on `check -assert` to claim the netlist was
+sound. That check turned out to be unreliable after `flatten`: Yosys keeps the flattened
+alias of every port alongside the port itself, `opt_clean` drops the alias, and `check`
+then reports the alias as undriven even though the port is driven by a cell. 87 warnings
+in the script, zero when the emitted netlist is read back on its own, identical under
+Yosys 0.33 and 0.54.
+
+The replacement is stronger and needs no argument at all: run the frame capture testbench
+against the mapped netlist and the PDK cell models, and diff the result against the same
+independent Python renderer the RTL is checked against. Either the netlist produces the
+same 307 200 pixels or it does not.
 
 ## SystemVerilog subset
 

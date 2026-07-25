@@ -18,6 +18,9 @@
 //   +skip=N        frames to discard before capturing (default 1)
 //   +frames=N      frames to capture (default 1)
 //   +ascii         also print the first captured frame as coarse ASCII art
+//
+// Compile with -DGATE_LEVEL against the synthesised netlist to run the same comparison on
+// the mapped design instead of the RTL.
 
 `timescale 1ps / 1ps
 
@@ -63,6 +66,12 @@ module tb_vte_frame;
   assign awprot = 3'b000;
   assign arprot = 3'b000;
 
+  // The gate level netlist has no parameters: synthesis resolved them, so the
+  // instantiation has to drop the override list. Everything else is identical, which is
+  // the point: the same testbench drives the RTL and the mapped netlist.
+`ifdef GATE_LEVEL
+  vga_text_engine dut (
+`else
   vga_text_engine #(
       .RedW      (RedW),
       .GreenW    (GreenW),
@@ -71,6 +80,7 @@ module tb_vte_frame;
       .AxiAddrW  (AxiAddrW),
       .FetchAddrW(32)
   ) dut (
+`endif
       .clk_i           (clk),
       .rst_ni          (rst_n),
       .clk_pix_i       (clk_pix),

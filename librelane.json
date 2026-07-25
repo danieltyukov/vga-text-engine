@@ -1,0 +1,28 @@
+{
+  "DESIGN_NAME": "vga_text_engine",
+  "PDK": "ihp-sg13g2",
+  "VERILOG_FILES": [
+    "dir::rtl/vte_modes_pkg.sv",
+    "dir::rtl/vte_pkg.sv",
+    "dir::rtl/vte_mode_lut.sv",
+    "dir::rtl/vte_sync2.sv",
+    "dir::rtl/vte_cdc_fifo.sv",
+    "dir::rtl/vte_frame_sync.sv",
+    "dir::rtl/vte_timing_gen.sv",
+    "dir::rtl/vte_glyph_rom.sv",
+    "dir::rtl/vte_shader.sv",
+    "dir::rtl/vte_fetch_engine.sv",
+    "dir::rtl/vte_axil_regs.sv",
+    "dir::rtl/vga_text_engine.sv"
+  ],
+  "VERILOG_DEFINES": [
+    "SYNTHESIS"
+  ],
+  "CLOCK_PORT": "clk_pix_i",
+  "CLOCK_PERIOD": 15.3846,
+  "PNR_SDC_FILE": "dir::pnr/vte.sdc",
+  "SIGNOFF_SDC_FILE": "dir::pnr/vte.sdc",
+  "FP_CORE_UTIL": 40,
+  "PL_TARGET_DENSITY_PCT": 50,
+  "RUN_LINTER": false
+}

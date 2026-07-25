@@ -4,7 +4,8 @@
 Nothing here is a mock up. The screenshots are the RGB pins of the RTL sampled during
 active video, written out as PPM by the testbenches and converted to PNG. The animation
 is a run of consecutive simulated frames. The two SVGs are hand written markup, and the
-cell count chart comes from the Yosys statistics.
+area and timing charts come from real synthesis and static timing analysis against the
+IHP SG13G2 PDK.
 
   make images     runs this with the default set
   --only NAME     limit the work to one target
@@ -161,9 +162,11 @@ def do_cursor_gif():
 
 
 def do_synth_chart():
-    sh(["yosys", "-q", "-l", str(ROOT / "synth" / "yosys.log"), str(ROOT / "synth" / "synth.ys")])
-    out = sh([sys.executable, str(HERE / "synth_report.py")])
-    print(out.strip())
+    """Real standard cell area per submodule, and the per mode timing closure chart."""
+    out = sh([sys.executable, str(HERE / "synth_sg13g2.py")])
+    print(out.strip().splitlines()[-1])
+    out = sh([sys.executable, str(HERE / "sta_sg13g2.py")])
+    print(out.strip().splitlines()[-1])
 
 
 def do_svg():

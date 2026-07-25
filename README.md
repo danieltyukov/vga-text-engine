@@ -31,7 +31,7 @@ on every test run.
 - [Parameters](#parameters)
 - [Gallery](#gallery)
 - [Verification](#verification)
-- [Synthesis](#synthesis)
+- [Silicon](#silicon)
 - [Repository layout](#repository-layout)
 - [Licence](#licence)
 
@@ -53,6 +53,8 @@ Compared with a plain monochrome fixed font text controller:
 | Clocking | single clock | separate register and pixel clocks with a proper gray coded crossing |
 | Text grid | fixed | columns and rows programmable, clamped to the active area, border colour outside the grid |
 | Register interface | ad hoc | AXI4-Lite subordinate with byte strobes and an exhaustively tested map |
+| Verification | visual inspection | pixel exact against an independent renderer, at RTL and at the gate level |
+| Physical evidence | none | real 130 nm standard cell area and per mode timing closure on an open PDK |
 
 ## Architecture
 
@@ -81,6 +83,8 @@ three jobs:
    many, so the buffer index mapping never drifts on its own. An underrun breaks that
    invariant. Draining the buffer once per frame while the producer is parked makes any
    drift heal within one frame instead of persisting forever.
+
+![frame synchronisation state machine](docs/img/fsm_frame_sync.svg)
 
 The pixel pipeline spends three register stages inside the eight pixel budget of one
 character cell, which buys the glyph ROM a full clock of read latency and lets it map to
@@ -405,14 +409,13 @@ two frames, and `TXT_DIV = 3`, so the blinking attribute flips every four.
 make venv     # once, creates .venv and installs pillow, numpy and matplotlib
 make lint     # Verilator -Wall, no warnings allowed
 make test     # build and run everything
-make synth    # Yosys synthesis smoke test
 make images   # regenerate docs/img from simulation output
-make all      # lint both parameter sets, test, synthesise
+make all      # lint both parameter sets, test, synthesise, time
 ```
 
-Toolchain: Icarus Verilog 12.0, Verilator 5.020, Yosys 0.33, Python 3.12. The RTL is
-written in a SystemVerilog subset all three read, so nothing here needs a commercial
-simulator.
+Toolchain: Icarus Verilog 12.0, Verilator 5.020, Yosys 0.33, OpenSTA 3.1.0 through
+OpenROAD, Python 3.12, and the IHP Open PDK SG13G2. The RTL is written in a SystemVerilog
+subset every one of those tools reads, so nothing here needs a commercial licence.
 
 Fourteen cases, all passing, about 160 seconds of wall clock at `-j 8`:
 
@@ -483,33 +486,112 @@ vvp results/sim/tb_vte_frame.vvp \
 `+ascii` prints the first 32 captured lines as coarse art, which is usually enough to
 spot a pipeline problem without opening a waveform viewer.
 
-## Synthesis
+## Silicon
 
-`make synth` maps the design to Yosys generic gates and writes
-[`docs/synth_report.txt`](docs/synth_report.txt). The committed report is regenerated
-and diffed in CI, so the numbers below cannot drift.
+The design is synthesised, timed and gate level simulated against the
+[IHP Open PDK SG13G2](https://github.com/IHP-GmbH/IHP-Open-PDK), an open source 130 nm
+BiCMOS process, so the numbers below are real standard cell area and real static timing
+rather than generic gate counts.
+
+```
+make synth     # Yosys to sg13g2 cells, three corners, docs/pdk_area_report.txt
+make sta       # OpenSTA per video mode and per corner, docs/sta_report.txt
+make gatesim   # simulate the mapped netlist, diff it against the reference renderer
+make pdk       # all three
+```
+
+### Area
+
+Signoff corner slow, 1.08 V, 125 C. Full report:
+[`docs/pdk_area_report.txt`](docs/pdk_area_report.txt).
 
 | metric | value |
 |---|---|
-| cells | 9777 |
-| flip flops | 1987 |
-| combinational cells | 7790 |
+| standard cell area | 175 325 um2, 0.175 mm2 |
+| cell instances | 8 777 |
+| flip flops | 1 955 |
+| equivalent NAND2 gates | 31 059 |
 | inferred latches | 0 |
-| black boxes | 0 |
+| unmapped cells | 0 |
 
-![cells per submodule](docs/img/synth_cells.png)
+Area is identical at all three corners, which is what should happen: Liberty cell areas
+are process independent, so only the timing moves. This is cell area after mapping, before
+place and route, so it excludes routing, filler and tap cells.
 
-The glyph ROM is 3072 bytes of constant data mapped to gates because the generic library
-has no memory primitive; on an FPGA or with a technology library it is one block RAM.
-`vte_frame_sync` carries two extra copies of the configuration bundle, one frozen shadow
-in the register domain and one live in the pixel domain, which is the price of atomic
-reconfiguration.
+![area per submodule](docs/img/pdk_area.png)
 
-For a real implementation, `clk_i` and `clk_pix_i` are asynchronous. The only paths
-between them are the gray coded FIFO pointers and the single bit handshake lines, all
-through `vte_sync2`, so declare them as separate clock groups. `clk_i` must be at least
-`clk_pix_i / 1000` for the frame handshake to fit inside vertical blanking, which any
-realistic system clock satisfies by a wide margin.
+Where it goes: the elastic buffer and the frame synchroniser together are 52 percent of
+the design, and both are storage. The buffer is 32 entries of 19 bits held in flip flops
+because a 130 nm standard cell library has no small dual port RAM, and the synchroniser
+carries two extra copies of the 295 bit configuration bundle, one frozen shadow in the
+register domain and one live in the pixel domain. That is the price of atomic
+reconfiguration, and it is worth knowing what it costs: about a quarter of the area buys
+software the guarantee that it never sees a torn frame.
+
+The glyph ROM is 3072 bytes of constant data mapped to logic, since the standard cell
+library has no ROM primitive. On an FPGA, or with an SRAM macro from the same PDK, it
+becomes one memory block and 8.5 percent of the area disappears.
+
+### Timing
+
+OpenSTA through OpenROAD, slow corner. Full report including both critical paths:
+[`docs/sta_report.txt`](docs/sta_report.txt).
+
+| mode | pixel clock needed | minimum period | slack | headroom | verdict |
+|---|---|---|---|---|---|
+| 640x480@60 | 25.175 MHz | 10.420 ns | +29.302 ns | 3.8x | met |
+| 800x600@60 | 40.000 MHz | 10.420 ns | +14.580 ns | 2.4x | met |
+| 1024x768@60 | 65.000 MHz | 10.420 ns | +4.965 ns | 1.5x | met |
+| 720x400@70 | 28.322 MHz | 10.420 ns | +24.888 ns | 3.4x | met |
+
+Every mode in the table closes at the slow corner. The pixel pipeline is one pixel per
+clock with no multi-cycle paths, so the critical path does not depend on the mode: the
+minimum period is the same in every row and only the requirement changes.
+
+![timing closure per mode](docs/img/fmax_modes.png)
+
+Maximum frequency per corner:
+
+| corner | supply | temperature | `clk_pix_i` | `clk_i` |
+|---|---|---|---|---|
+| slow | 1.08 V | 125 C | 95.96 MHz | 71.26 MHz |
+| typical | 1.20 V | 25 C | 150.27 MHz | 111.17 MHz |
+| fast | 1.32 V | -40 C | 227.85 MHz | 152.38 MHz |
+
+These are synthesis level numbers: ideal clock networks, no wire load model, and no fanout
+repair. They are also load limited rather than logic limited, which is worth being
+explicit about. Both critical paths are only a few gates deep, and almost all of the delay
+is one unbuffered net: 419 loads for 11.50 ns in the register domain, 155 loads for
+7.33 ns in the pixel domain. Those nets are the enables that gate the 295 bit
+configuration snapshot, so a single signal reaches several hundred flip flop enable inputs
+and `abc` drives it from a minimum size gate. A place and route flow inserts a buffer tree
+there and the stage collapses, so the frequencies above understate the built design. They
+are quoted as measured rather than adjusted, and every video mode closes anyway.
+
+### Gate level check
+
+`make gatesim` runs the same frame capture testbench against the mapped netlist and the
+PDK's behavioural cell models, then diffs the captured frame against the independent
+Python reference renderer. It is the strongest statement available about the synthesis
+result: the netlist Yosys emitted renders exactly the pixels the RTL does, all 307 200 of
+them, with no structural argument required.
+
+The PDK cell models need one rewrite before Icarus Verilog will read them. Their `specify`
+blocks use `ifnone` with edge sensitive paths, which Icarus rejects, and the sequential
+cells route their inputs through `delayed_CLK`, `delayed_D` and `delayed_RESET_B` wires
+that the `specify` block is what drives. Deleting the blocks leaves those wires
+permanently X and the whole design goes X. All 505 delay assignments in the file are
+`(0.0, 0.0)`, so `scripts/gatesim.py` rewrites each block into the zero delay identity it
+stands for, `assign delayed_X = X`, and refuses to run if a non zero delay ever appears or
+if a delayed wire has no port to alias.
+
+### Implementation notes
+
+`clk_i` and `clk_pix_i` are asynchronous. The only paths between them are the gray coded
+FIFO pointers and the single bit handshake lines, all through `vte_sync2`, so declare them
+as separate clock groups; `synth/sta.tcl.in` shows the constraint. `clk_i` must be at
+least `clk_pix_i / 1000` for the frame handshake to fit inside vertical blanking, which
+any realistic system clock satisfies by a wide margin.
 
 ## Repository layout
 
@@ -534,9 +616,15 @@ realistic system clock satisfies by a wide margin.
 | `scripts/scenes.py` | scene stimulus generator |
 | `scripts/run_tests.py` | test runner |
 | `scripts/make_images.py` | regenerates everything in `docs/img` |
+| `scripts/pdk.py` | IHP SG13G2 paths and corner definitions |
+| `scripts/synth_sg13g2.py` | synthesis to real standard cells, area report and chart |
+| `scripts/sta_sg13g2.py` | per mode and per corner static timing analysis |
+| `scripts/gatesim.py` | gate level simulation of the mapped netlist |
 | `docs/design.md` | microarchitecture decisions, buffer sizing maths, verification plan |
-| `docs/synth_report.txt` | committed synthesis statistics |
-| `synth/synth.ys` | Yosys script |
+| `docs/pdk_area_report.txt` | committed standard cell area and cell histogram |
+| `docs/sta_report.txt` | committed timing reports including both critical paths |
+| `synth/synth_sg13g2.ys.in` | Yosys script template |
+| `synth/sta.tcl.in` | OpenSTA constraint template |
 
 The glyph ROM is generated. After editing `scripts/font_data.py`, run `make font` to
 regenerate `rtl/vte_glyph_rom.sv`.

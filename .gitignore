@@ -18,3 +18,5 @@ synth/*.v
 synth/*.log
 synth/stat_*.txt
 synth/out/
+runs/
+pnr/librelane.log
