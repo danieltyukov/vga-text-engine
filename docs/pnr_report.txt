@@ -1,0 +1,150 @@
+vga_text_engine place and route
+============================================================================
+
+Tool      : LibreLane 3.0.0.dev44, OpenROAD and Magic and KLayout
+PDK       : IHP Open PDK SG13G2, 130 nm
+Config    : librelane.json, constraints in pnr/vte.sdc
+Top       : vga_text_engine
+Clocks    : clk_pix_i at 15.3846 ns (the 1024x768 requirement),
+            clk_i at 20.0 ns, declared as asynchronous clock groups
+Metrics   : final/metrics.json
+
+Physical
+----------------------------------------------------------------------------
+  die area                          476640 um2
+  core area                         447681 um2
+  cell area                         447681 um2
+  core utilisation                   0.603 
+  instances                          34905 
+  total wire length                 577240 um
+  vias                               97484 
+  total power                       0.0105 W
+
+Signoff checks
+----------------------------------------------------------------------------
+  routing DRC violations                   0   pass
+  Magic DRC violations                     0   pass
+  KLayout DRC violations                   0   pass
+  LVS errors                               0   pass
+  LVS unmatched nets                       0   pass
+  LVS unmatched devices                    0   pass
+  LVS unmatched pins                       0   pass
+  LVS property failures                    0   pass
+  setup violations                         0   pass
+  hold violations                          0   pass
+
+Reported with context
+----------------------------------------------------------------------------
+  disconnected pins                       19
+  antenna violating nets                   3
+
+  The disconnected pins are inputs the design documents as ignored:
+    fetch_rdata_i             13 bit(s)
+    s_axil_arprot_i            3 bit(s)
+    s_axil_awprot_i            3 bit(s)
+  fetch_rdata_i[31:19] are the reserved bits of the cell word and the
+  AXI protection buses are accepted and ignored, both stated in the
+  README. The flow itself reports none of them as critical, so the
+  physical run independently confirms the documented ignore list.
+
+  Antenna violations are counted after the flow's own repair step. A
+  handful on an unpadded core is a manufacturability note for whoever
+  integrates the block, not a functional defect.
+
+Timing, signoff corner
+----------------------------------------------------------------------------
+  timing__drv__floating__nets                               0.0000
+  timing__drv__floating__pins                               0.0000
+  timing__hold__tns                                         0.0000
+  timing__hold__tns__corner:nom_fast_1p32V_m40C             0.0000
+  timing__hold__tns__corner:nom_slow_1p08V_125C             0.0000
+  timing__hold__tns__corner:nom_typ_1p20V_25C               0.0000
+  timing__hold__wns                                         0.0000
+  timing__hold__wns__corner:nom_fast_1p32V_m40C             0.0000
+  timing__hold__wns__corner:nom_slow_1p08V_125C             0.0000
+  timing__hold__wns__corner:nom_typ_1p20V_25C               0.0000
+  timing__hold__ws                                          0.0571
+  timing__hold__ws__corner:nom_fast_1p32V_m40C              0.0571
+  timing__hold__ws__corner:nom_slow_1p08V_125C              0.5187
+  timing__hold__ws__corner:nom_typ_1p20V_25C                0.2141
+  timing__hold_r2r__ws                                      0.0839
+  timing__hold_r2r__ws__corner:nom_fast_1p32V_m40C          0.0839
+  timing__hold_r2r__ws__corner:nom_slow_1p08V_125C          0.5858
+  timing__hold_r2r__ws__corner:nom_typ_1p20V_25C            0.2634
+  timing__hold_r2r_vio__count                               0.0000
+  timing__hold_r2r_vio__count__corner:nom_fast_1p32V_m40C      0.0000
+  timing__hold_r2r_vio__count__corner:nom_slow_1p08V_125C      0.0000
+  timing__hold_r2r_vio__count__corner:nom_typ_1p20V_25C      0.0000
+  timing__hold_vio__count                                   0.0000
+  timing__hold_vio__count__corner:nom_fast_1p32V_m40C       0.0000
+  timing__hold_vio__count__corner:nom_slow_1p08V_125C       0.0000
+  timing__hold_vio__count__corner:nom_typ_1p20V_25C         0.0000
+  timing__setup__tns                                        0.0000
+  timing__setup__tns__corner:nom_fast_1p32V_m40C            0.0000
+  timing__setup__tns__corner:nom_slow_1p08V_125C            0.0000
+  timing__setup__tns__corner:nom_typ_1p20V_25C              0.0000
+  timing__setup__wns                                        0.0000
+  timing__setup__wns__corner:nom_fast_1p32V_m40C            0.0000
+  timing__setup__wns__corner:nom_slow_1p08V_125C            0.0000
+  timing__setup__wns__corner:nom_typ_1p20V_25C              0.0000
+  timing__setup__ws                                         7.5848
+  timing__setup__ws__corner:nom_fast_1p32V_m40C            11.9698
+  timing__setup__ws__corner:nom_slow_1p08V_125C             7.5848
+  timing__setup__ws__corner:nom_typ_1p20V_25C              10.3692
+  timing__setup_r2r__ws                                     7.5848
+  timing__setup_r2r__ws__corner:nom_fast_1p32V_m40C        11.9698
+  timing__setup_r2r__ws__corner:nom_slow_1p08V_125C         7.5848
+  timing__setup_r2r__ws__corner:nom_typ_1p20V_25C          10.3692
+  timing__setup_r2r_vio__count                              0.0000
+  timing__setup_r2r_vio__count__corner:nom_fast_1p32V_m40C      0.0000
+  timing__setup_r2r_vio__count__corner:nom_slow_1p08V_125C      0.0000
+  timing__setup_r2r_vio__count__corner:nom_typ_1p20V_25C      0.0000
+  timing__setup_vio__count                                  0.0000
+  timing__setup_vio__count__corner:nom_fast_1p32V_m40C      0.0000
+  timing__setup_vio__count__corner:nom_slow_1p08V_125C      0.0000
+  timing__setup_vio__count__corner:nom_typ_1p20V_25C        0.0000
+  timing__unannotated_net__count                          295.0000
+  timing__unannotated_net__count__corner:nom_fast_1p32V_m40C    295.0000
+  timing__unannotated_net__count__corner:nom_slow_1p08V_125C    295.0000
+  timing__unannotated_net__count__corner:nom_typ_1p20V_25C    295.0000
+  timing__unannotated_net_filtered__count                   0.0000
+  timing__unannotated_net_filtered__count__corner:nom_fast_1p32V_m40C      0.0000
+  timing__unannotated_net_filtered__count__corner:nom_slow_1p08V_125C      0.0000
+  timing__unannotated_net_filtered__count__corner:nom_typ_1p20V_25C      0.0000
+
+Where the area went
+----------------------------------------------------------------------------
+  fill_cell                             177706 um2 
+  sequential_cell                        96804 um2    35.9% of cells
+  multi_input_combinational_cell         83736 um2    31.0% of cells
+  timing_repair_buffer                   73282 um2    27.1% of cells
+  clock_buffer                           12434 um2     4.6% of cells
+  inverter                                2097 um2     0.8% of cells
+  clock_inverter                          1495 um2     0.6% of cells
+  buffer                                   127 um2     0.0% of cells
+  total, including fill                 447681 um2
+
+Area at each stage
+----------------------------------------------------------------------------
+  standard cell area at synthesis           175325 um2
+  standard cell area after routing          269975 um2   1.54x
+  core area, cells plus fill                447681 um2
+  die area                                  476640 um2
+
+  The cells grew by 94650 um2 between synthesis and routing, and
+  73282 um2 of that is timing repair buffers with another 13929 um2
+  of clock tree: 92 percent of the growth.
+
+  That is the same story the synthesis timing report tells from the other
+  end. Synthesis left the enables that gate the configuration snapshot
+  driven by minimum size gates into several hundred loads, and place and
+  route spent a quarter of the cell area buffering them. The setup slack
+  improved from +4.965 ns at synthesis level to
+  +7.585 ns after routing, at the same 15.3846 ns pixel clock.
+
+  Quote the die area if only one number is quoted. Fill cells are not
+  logic, so the honest comparison against a synthesis estimate is the
+  standard cell figure.
+
+Run directory: runs/vte
+

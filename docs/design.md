@@ -367,8 +367,12 @@ Stated plainly rather than left to be discovered:
 
 - No formal property checking. The alignment invariant is argued in this document and
   tested at frame granularity, not proved.
-- No post layout simulation. Gate level simulation runs on the mapped netlist with zero
-  delay cell models, so it proves function, not timing. Timing comes from static analysis.
+- No post layout simulation. Gate level simulation runs on the pre layout mapped netlist
+  with zero delay cell models, so it proves function, not timing. Timing comes from static
+  analysis, before and after routing.
+- The place and route run leaves three antenna violating nets after the flow's own repair
+  step. On a block meant for integration rather than a standalone die that is a note for
+  the integrator, not something this repository can close.
 - Static timing analysis is at synthesis level: ideal clocks, no wire load model, no
   fanout repair. The frequencies are load limited by unbuffered high fanout enables and
   would improve after place and route.
@@ -419,6 +423,14 @@ The design implication is not "fix the RTL". It is that the frequency this desig
 depends on buffering rather than on restructuring logic, which is the easy kind of
 dependency: no pipeline stage has to be added, and the numbers already clear every video
 mode at the slow corner.
+
+Place and route confirms it from the other end. LibreLane spent 73 282 um2 on timing repair
+buffers, 27 percent of the post route cell area, plus 13 929 um2 of clock tree. Those two
+account for 92 percent of the growth from 175 325 um2 of synthesis cell area to 269 975 um2
+after routing, and in exchange the setup slack went from +4.965 ns to +7.585 ns at the same
+pixel clock, so the pixel domain closes at about 128 MHz rather than 96. The synthesis
+estimate was pessimistic in exactly the way it said it would be, which is the useful
+outcome: the prediction and the measurement agree about the mechanism.
 
 ### Every video mode is a verified claim
 

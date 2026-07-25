@@ -494,10 +494,12 @@ BiCMOS process, so the numbers below are real standard cell area and real static
 rather than generic gate counts.
 
 ```
-make synth     # Yosys to sg13g2 cells, three corners, docs/pdk_area_report.txt
-make sta       # OpenSTA per video mode and per corner, docs/sta_report.txt
-make gatesim   # simulate the mapped netlist, diff it against the reference renderer
-make pdk       # all three
+make synth       # Yosys to sg13g2 cells, three corners, docs/pdk_area_report.txt
+make sta         # OpenSTA per video mode and per corner, docs/sta_report.txt
+make gatesim     # simulate the mapped netlist, diff it against the reference renderer
+make pdk         # all three
+make pnr         # full RTL to GDS with LibreLane, DRC and LVS
+make pnr-report  # summarise the run and render docs/img/layout.png
 ```
 
 ### Area
@@ -586,6 +588,46 @@ permanently X and the whole design goes X. All 505 delay assignments in the file
 stands for, `assign delayed_X = X`, and refuses to run if a non zero delay ever appears or
 if a delayed wire has no port to alias.
 
+### Place and route
+
+`make pnr` takes the RTL all the way to GDS with LibreLane, then `make pnr-report`
+summarises it and renders the layout. Constraints are in
+[`pnr/vte.sdc`](pnr/vte.sdc) rather than the flow's generic fallback, because a single
+clock constraint on a two clock design reports meaningless timing. Full report:
+[`docs/pnr_report.txt`](docs/pnr_report.txt).
+
+![routed layout](docs/img/layout.png)
+
+| | value |
+|---|---|
+| die area | 476 640 um2, 0.477 mm2 |
+| core area | 447 681 um2 |
+| standard cell area after routing | 269 975 um2 |
+| core utilisation | 0.603 |
+| instances | 34 905 including fill |
+| total wire length | 577 240 um |
+| vias | 97 484 |
+| total power | 10.5 mW |
+
+Every signoff check is clean: routing DRC 0, Magic DRC 0, KLayout DRC 0, LVS 0 errors and
+0 unmatched nets, devices, pins or properties, setup violations 0, hold violations 0 at
+all three corners. Worst setup slack is **+7.585 ns** at the slow corner with the pixel
+clock at the 1024x768 requirement, and worst hold slack +0.057 ns at the fast corner.
+
+The flow reports 19 disconnected pins, and the physical run happens to confirm the
+documentation: they are exactly `fetch_rdata_i[31:19]`, the reserved bits of the cell word,
+and the six AXI protection bits, both of which the README already describes as ignored. The
+flow classes none of them as critical. Three antenna violating nets remain after the
+repair step, which is a manufacturability note for whoever integrates the block.
+
+The interesting result is what happened to the timing. Synthesis said the critical path was
+one minimum size gate driving several hundred loads. Place and route spent **73 282 um2 on
+timing repair buffers**, 27 percent of the post route cell area, plus 13 929 um2 of clock
+tree, which is 92 percent of the entire growth from 175 325 um2 to 269 975 um2. In exchange
+the setup slack went from +4.965 ns at synthesis level to +7.585 ns after routing, so the
+pixel domain closes at about 128 MHz rather than 96. The synthesis estimate was pessimistic
+in exactly the way it predicted it would be.
+
 ### Implementation notes
 
 `clk_i` and `clk_pix_i` are asynchronous. The only paths between them are the gray coded
@@ -624,6 +666,8 @@ any realistic system clock satisfies by a wide margin.
 | `docs/design.md` | microarchitecture decisions, buffer sizing maths, verification plan |
 | `docs/pdk_area_report.txt` | committed standard cell area and cell histogram |
 | `docs/sta_report.txt` | committed timing reports including both critical paths |
+| `docs/pnr_report.txt` | committed place and route results, area, checks and timing |
+| `librelane.json`, `pnr/vte.sdc` | place and route configuration and constraints |
 | `synth/synth_sg13g2.ys.in` | Yosys script template |
 | `synth/sta.tcl.in` | OpenSTA constraint template |
 
