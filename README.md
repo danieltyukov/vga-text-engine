@@ -582,9 +582,9 @@ frame at RTL, which is why it is a separate target rather than part of `make tes
 
 The PDK cell models need one rewrite before Icarus Verilog will read them. Their `specify`
 blocks use `ifnone` with edge sensitive paths, which Icarus rejects, and the sequential
-cells route their inputs through `delayed_CLK`, `delayed_D` and `delayed_RESET_B` wires
-that the `specify` block is what drives. Deleting the blocks leaves those wires
-permanently X and the whole design goes X. All 505 delay assignments in the file are
+cells read their inputs through `delayed_CLK`, `delayed_D` and `delayed_RESET_B` wires
+that nothing but the `specify` block drives. Deleting the blocks leaves those wires
+permanently X and takes the whole design with them. All 505 delay assignments in the file are
 `(0.0, 0.0)`, so `scripts/gatesim.py` rewrites each block into the zero delay identity it
 stands for, `assign delayed_X = X`, and refuses to run if a non zero delay ever appears or
 if a delayed wire has no port to alias.
