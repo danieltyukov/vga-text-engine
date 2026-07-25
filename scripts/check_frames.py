@@ -19,13 +19,14 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import model  # noqa: E402
 
 
-def compare(scene, scene_dir, out_dir, skip, frames, verbose=True):
+def compare(scene, scene_dir, out_dir, skip, frames, verbose=True, prefix=None):
     regs = model.parse_regs(pathlib.Path(scene_dir) / f"{scene}.regs")
     mem = model.parse_mem(pathlib.Path(scene_dir) / f"{scene}.mem")
+    prefix = prefix or scene
     ok = True
     for i in range(frames):
         idx = skip + i
-        ppm = pathlib.Path(out_dir) / f"{scene}_{idx}.ppm"
+        ppm = pathlib.Path(out_dir) / f"{prefix}_{idx}.ppm"
         if not ppm.exists():
             print(f"FAIL {scene} frame {idx}: {ppm} was not produced")
             ok = False
@@ -59,8 +60,11 @@ def main():
     ap.add_argument("--dir", default="results/sim")
     ap.add_argument("--skip", type=int, default=1)
     ap.add_argument("--frames", type=int, default=1)
+    ap.add_argument("--prefix", default=None,
+                    help="PPM file prefix, defaults to the scene name")
     args = ap.parse_args()
-    ok = compare(args.scene, args.scene_dir, args.dir, args.skip, args.frames)
+    ok = compare(args.scene, args.scene_dir, args.dir, args.skip, args.frames,
+                 prefix=args.prefix)
     print("TEST_RESULT: PASS" if ok else "TEST_RESULT: FAIL")
     return 0 if ok else 1
 

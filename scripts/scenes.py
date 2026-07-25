@@ -319,7 +319,24 @@ def scene_1024():
     return s
 
 
+def scene_blink():
+    """Isolated blink targets: a bare cursor cell and a solid blinking block."""
+    s = Scene("blink", mode=0, cols=80, rows=30, font_h16=True, border=0,
+              cur_en=True, cur_col=4, cur_row=4, cur_start=0, cur_end=15,
+              cur_div=1, txt_div=3, uline_row=15)
+    s.text(1, 2, "BLINK RATE TEST", fg=15, uline=True)
+    # Cursor sits on an untouched space so the sample pixel is background when the
+    # overlay is off and foreground when it is on.
+    s.text(4, 8, "<- cursor cell, CUR_DIV=1", fg=7)
+    # A solid block with the BLINK attribute: every pixel of the cell follows the
+    # text blink phase.
+    s.fill(8, 8, 4, cell(G_BLOCK, 14, 0, blink=True))
+    s.text(8, 14, "<- blinking block, TXT_DIV=3", fg=7)
+    return s
+
+
 SCENES = {
+    "blink": scene_blink,
     "demo": scene_demo,
     "palette": scene_palette,
     "attr": scene_attr,
