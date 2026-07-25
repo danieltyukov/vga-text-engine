@@ -28,6 +28,6 @@ set_input_delay  0.0 -clock clk_pix [get_ports {rst_pix_ni}]
 set_output_delay 0.0 -clock clk_reg [get_ports {fetch_req_o fetch_addr_o frame_o underrun_o}]
 set_output_delay 0.0 -clock clk_pix [get_ports {hsync_o vsync_o de_o red_o green_o blue_o}]
 
-set_driving_cell -lib_cell sg13g2_buf_4 -pin Z [all_inputs]
+set_driving_cell -lib_cell sg13g2_buf_4 -pin X [all_inputs]
 set_load 0.05 [all_outputs]
 set_max_fanout 24 [current_design]

@@ -440,7 +440,15 @@ Yosys 0.33 and 0.54.
 The replacement is stronger and needs no argument at all: run the frame capture testbench
 against the mapped netlist and the PDK cell models, and diff the result against the same
 independent Python renderer the RTL is checked against. Either the netlist produces the
-same 307 200 pixels or it does not.
+same 307 200 pixels or it does not. It does, at the slow corner, in about 22 minutes of
+simulation against 11 seconds for the same frame at RTL.
+
+Getting there needed one thing understood about the PDK's cell models. Their `specify`
+blocks are what drive the `delayed_CLK`, `delayed_D` and `delayed_RESET_B` wires the
+sequential cells read, so deleting the blocks to get past Icarus Verilog's refusal to parse
+`ifnone` with edge sensitive paths turns the entire design X. All 505 delays in the file are
+zero, so `scripts/gatesim.py` rewrites each block into the identity it stands for instead,
+and refuses to run if a non zero delay appears or if a delayed wire has no port to alias.
 
 ## SystemVerilog subset
 

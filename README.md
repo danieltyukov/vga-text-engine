@@ -573,8 +573,9 @@ are quoted as measured rather than adjusted, and every video mode closes anyway.
 `make gatesim` runs the same frame capture testbench against the mapped netlist and the
 PDK's behavioural cell models, then diffs the captured frame against the independent
 Python reference renderer. It is the strongest statement available about the synthesis
-result: the netlist Yosys emitted renders exactly the pixels the RTL does, all 307 200 of
-them, with no structural argument required.
+result, and it passes: the slow corner netlist renders **307 200 identical pixels**, with
+no structural argument required. It takes about 22 minutes against 11 seconds for the same
+frame at RTL, which is why it is a separate target rather than part of `make test`.
 
 The PDK cell models need one rewrite before Icarus Verilog will read them. Their `specify`
 blocks use `ifnone` with edge sensitive paths, which Icarus rejects, and the sequential
