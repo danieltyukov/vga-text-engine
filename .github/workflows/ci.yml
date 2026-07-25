@@ -32,6 +32,11 @@ jobs:
       - name: Test
         run: make test JOBS=4
 
+      # Yosys builds the model and yosys-abc runs the proof, so this needs nothing the
+      # lint and test steps have not already installed.
+      - name: Formal
+        run: make formal
+
       # The IHP PDK, OpenROAD and OpenSTA are not available on a plain GitHub runner, so
       # the silicon flow is a local target. Everything it produces is committed:
       # docs/pdk_area_report.txt, docs/sta_report.txt and the two charts in docs/img.
@@ -42,6 +47,7 @@ jobs:
         with:
           name: reports
           path: |
+            docs/formal_report.txt
             docs/pdk_area_report.txt
             docs/sta_report.txt
           if-no-files-found: warn

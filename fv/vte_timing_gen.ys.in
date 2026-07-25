@@ -1,0 +1,48 @@
+# Copyright 2026 Daniel Tyukov
+# SPDX-License-Identifier: Apache-2.0
+#
+# Build an AIGER model of fv/fv_timing_gen.sv for ABC.
+#
+# Template. scripts/formal_report.py substitutes @DEFINES@ and @AIG@ and writes the result
+# next to the model so a run can be reproduced by hand.
+#
+# SYNTHESIS is defined so the simulation only elaboration checks, which use $fatal, are
+# excluded from the formal model.
+#
+# async2sync rewrites the design's asynchronous resets into synchronous form. Without it the
+# only option is multiclock, which sends everything through clk2fflogic and leaves a model
+# yosys-smtbmc cannot make progress on.
+#
+# flatten before opt so the frame counter, the vertical blanking flag and the frame edge
+# pulse can be pruned: they are design outputs that no property reads, so they only survive
+# as long as the module boundary does. That takes 32 flip flops of irrelevant state out of
+# the problem.
+
+read_verilog -formal -sv -DSYNTHESIS @DEFINES@ rtl/vte_modes_pkg.sv
+read_verilog -formal -sv -DSYNTHESIS @DEFINES@ rtl/vte_pkg.sv
+read_verilog -formal -sv -DSYNTHESIS @DEFINES@ rtl/vte_mode_lut.sv
+read_verilog -formal -sv -DSYNTHESIS @DEFINES@ rtl/vte_timing_gen.sv
+read_verilog -formal -sv -DSYNTHESIS @DEFINES@ fv/fv_timing_gen.sv
+
+prep -top fv_timing_gen -flatten
+async2sync
+
+# AIGER carries safety properties only, so the cover cells have to go. The reachability run
+# converts the same states into assertions instead, via FV_REACH, which is what actually
+# tests them.
+chformal -remove -cover
+opt -full
+opt_clean
+
+stat
+
+# AIGER is an and inverter graph, so the arithmetic has to be reduced to gates first and
+# the flops to plain D types. This is the same sequence SymbiYosys generates for its ABC
+# engines.
+memory_map
+techmap
+dffunmap
+abc -g AND -fast
+opt_clean
+
+write_aiger -zinit -map @AIG@.map @AIG@

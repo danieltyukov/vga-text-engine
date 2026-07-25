@@ -33,9 +33,9 @@ RTL := \
 	$(RTL_DIR)/vte_axil_regs.sv \
 	$(RTL_DIR)/vga_text_engine.sv
 
-.PHONY: all help venv lint lint-config test synth sta gatesim pdk harden harden-report images font clean distclean
+.PHONY: all help venv lint lint-config test formal synth sta gatesim pdk harden harden-report images font clean distclean
 
-all: lint lint-config test synth sta ## lint, test, synthesise and time (synth and sta need the PDK)
+all: lint lint-config test formal synth sta ## lint, test, prove, synthesise and time (synth and sta need the PDK)
 
 help: ## list the targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -61,6 +61,9 @@ lint-config: ## lint a second parameter set, RGB444 output and a deeper buffer
 
 test: venv ## build and run every testbench
 	$(PY) scripts/run_tests.py -j $(JOBS)
+
+formal: venv ## prove the sync generator properties with Yosys and ABC
+	$(PY) scripts/formal_report.py
 
 synth: venv ## synthesise to the IHP SG13G2 130 nm PDK, real um2 (needs the PDK)
 	$(PY) scripts/synth_sg13g2.py
@@ -89,8 +92,8 @@ images: venv ## regenerate every image in docs/img from simulation output
 font: venv ## regenerate rtl/vte_glyph_rom.sv from scripts/font_data.py
 	$(PY) scripts/gen_glyph_rom.py
 
-clean: ## remove simulation and synthesis artefacts
-	rm -rf $(RESULTS) synth/out
+clean: ## remove simulation, synthesis and formal artefacts
+	rm -rf $(RESULTS) synth/out fv/work
 
 distclean: clean ## also remove the Python environment
 	rm -rf $(VENV)

@@ -1,0 +1,85 @@
+vga_text_engine formal verification
+============================================================================
+
+Tools     : Yosys 0.33 for the model, ABC 1.01 for the proof and the reachability runs
+Harness   : fv/fv_timing_gen.sv
+Script    : fv/vte_timing_gen.ys.in, driven by scripts/formal_report.py
+Under proof: rtl/vte_timing_gen.sv, the sync generator
+
+The frame comparison tests prove the renderer is right for the frames they
+capture. This proof covers every reachable state and every legal configuration,
+including the twelve mode indices outside the table and grid sizes larger than
+any mode can display, none of which a captured frame reaches.
+
+The configuration is an anyconst snapshot: a value the solver chooses freely
+and which then never changes, matching the contract that vte_frame_sync
+snapshots it once per frame. Only the four fields the sync generator reads are
+given to the solver; the other 274 bits of the bundle do not reach this module.
+The harness contains no assume statements, so it cannot over constrain the
+design and a vacuous proof is impossible by construction.
+
+Properties
+----------------------------------------------------------------------------
+  P1  the horizontal counter never leaves its own total
+  P2  the vertical counter never leaves its own total
+  P3  data enable is never asserted while the horizontal sync pulse is active
+  P4  data enable is never asserted while the vertical sync pulse is active
+  P5  the text grid is never painted outside active video
+  P6  the character prefetch window lies entirely inside the line, so the eight pixel lead can never reach back past the start of the line or forward into active video
+  P7  the glyph row index never exceeds the height of the selected font
+
+Result
+----------------------------------------------------------------------------
+  model            70 latches, 2209 AND gates, 67 inputs
+  assertions       8 for 7 properties, P6 being two comparisons
+  engine           ABC PDR, property directed reachability
+  verdict          PROVED
+  time             1.02 s
+  invariant        75 clauses over 40 of 70 flops, found at frame 42
+
+  PDR returning an inductive invariant is an unbounded proof: the
+  properties hold in every reachable state, not to some depth.
+
+Reachability, so the proof is not vacuous
+----------------------------------------------------------------------------
+  The same harness rebuilt with FV_REACH asserts the negation of each
+  interesting state, so a counterexample is a concrete trace to that state.
+  Engine: ABC sim3, random simulation with SAT based state jumping. Only the
+  positive direction counts: a trace proves the state occurs, a miss would
+  prove nothing, and the frame number is the depth of the witness sim3 found
+  rather than a shortest path.
+
+  state                       verdict                         time
+  data enable                 reached at cycle 28147         5.52 s
+  prefetch window             reached at cycle 28139         6.87 s
+  hsync pulse active          reached at cycle 3             0.05 s
+  text grid painted           reached at cycle 28147         6.31 s
+
+  All four occur, so the assertions above are constraining real behaviour
+  rather than holding because the state never arises.
+
+  The depths are the ones the mode table predicts. Data enable first rises
+  at the first active pixel of the shallowest mode: 640x480 spends
+  (2 + 33) blanking lines of 800 pixels plus 96 + 48 pixels of horizontal
+  blanking, which is 28 144 pixel clocks, and the counters restart whenever
+  en_i drops. Bounded model checking would have to unroll that far, which is
+  why the engine here is sim3.
+
+What this does and does not establish
+----------------------------------------------------------------------------
+  Established, for any mode index, any grid size, any glyph height and any
+  enable behaviour: the sync generator cannot run a counter past its total,
+  cannot drive data enable during either sync pulse, cannot paint the text grid
+  outside active video, cannot place the prefetch window outside the line, and
+  cannot index a glyph row beyond the height of the selected font.
+
+  P1 and P2 are the ones that justify a specific decision: the counter wrap
+  tests use >= rather than == so a geometry change latched mid blanking cannot
+  strand a counter above its new total. P6 is what justifies walking a line
+  SYNC, BACK PORCH, ACTIVE, FRONT PORCH.
+
+  Not established: the pixel values. Nothing here says the right glyph or the
+  right colour comes out, which is what the pixel exact comparison against the
+  reference renderer is for. The elastic buffer, the fetch engine, the register
+  file and the clock domain crossing are covered by simulation only.
+
