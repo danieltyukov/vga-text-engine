@@ -179,19 +179,24 @@ module vte_axil_regs #(
     reg_value = v;
   endfunction
 
+  // Unrolled on purpose: a loop with a variable part select base is not portable
+  // across the simulators in this flow.
   function automatic logic [31:0] be_merge(input logic [31:0] cur, input logic [31:0] nw,
                                            input logic [3:0] be);
     logic [31:0] r;
-    r = cur;
-    for (int unsigned i = 0; i < 4; i++) begin
-      if (be[i]) r[8*i+:8] = nw[8*i+:8];
-    end
+    r[7:0]   = be[0] ? nw[7:0] : cur[7:0];
+    r[15:8]  = be[1] ? nw[15:8] : cur[15:8];
+    r[23:16] = be[2] ? nw[23:16] : cur[23:16];
+    r[31:24] = be[3] ? nw[31:24] : cur[31:24];
     be_merge = r;
   endfunction
 
-  assign rd_mux = reg_value(rd_off, rd_in_range, rd_is_pal, rd_pal_idx);
-  assign wr_cur = reg_value(wr_off, wr_in_range, wr_is_pal, wr_pal_idx);
-  assign wr_val = be_merge(wr_cur, wdata_q, wstrb_q);
+  // always_comb rather than assign: a continuous assignment whose right hand side is
+  // a function call is not guaranteed to be re-evaluated when a signal the function
+  // reads internally changes, and reg_value reads the whole register file.
+  always_comb rd_mux = reg_value(rd_off, rd_in_range, rd_is_pal, rd_pal_idx);
+  always_comb wr_cur = reg_value(wr_off, wr_in_range, wr_is_pal, wr_pal_idx);
+  always_comb wr_val = be_merge(wr_cur, wdata_q, wstrb_q);
 
   // ---------------------------------------------------------------------------
   // Sequential
