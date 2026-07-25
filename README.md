@@ -488,10 +488,11 @@ spot a pipeline problem without opening a waveform viewer.
 
 ## Silicon
 
-The design is synthesised, timed and gate level simulated against the
+The design is synthesised, timed, gate level simulated and taken all the way to GDS with
+DRC and LVS signoff against the
 [IHP Open PDK SG13G2](https://github.com/IHP-GmbH/IHP-Open-PDK), an open source 130 nm
-BiCMOS process, so the numbers below are real standard cell area and real static timing
-rather than generic gate counts.
+BiCMOS process. So the figures below are real standard cell area, real static timing and a
+real routed die rather than generic gate counts, and every tool involved is open source.
 
 ```
 make synth       # Yosys to sg13g2 cells, three corners, docs/pdk_area_report.txt
