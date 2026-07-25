@@ -25,7 +25,7 @@ RTL := \
 	$(RTL_DIR)/vte_axil_regs.sv \
 	$(RTL_DIR)/vga_text_engine.sv
 
-.PHONY: all help venv lint lint-config test synth sta gatesim pdk images font clean distclean
+.PHONY: all help venv lint lint-config test synth sta gatesim pdk pnr pnr-report images font clean distclean
 
 all: lint lint-config test synth sta ## lint, test, synthesise and time (synth and sta need the PDK)
 
@@ -64,6 +64,12 @@ gatesim: venv ## simulate the mapped netlist against the reference renderer (slo
 	$(PY) scripts/gatesim.py
 
 pdk: synth sta gatesim ## the whole silicon flow: area, timing, gate level check
+
+pnr: ## full RTL to GDS with DRC and LVS (needs librelane, takes an hour)
+	librelane --run-tag vte librelane.json
+
+pnr-report: venv ## summarise the place and route run and render the layout
+	$(PY) scripts/pnr_report.py
 
 images: venv ## regenerate every image in docs/img from simulation output
 	$(PY) scripts/make_images.py
